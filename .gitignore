@@ -1,0 +1,20 @@
+# Data directories
+data/
+*.log
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Gradle
+.gradle/
+build/

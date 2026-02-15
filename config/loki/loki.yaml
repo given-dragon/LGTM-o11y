@@ -1,0 +1,109 @@
+# Loki Configuration - Single Process Mode (Monolithic)
+# 공식 문서: https://grafana.com/docs/loki/latest/
+
+auth_enabled: true  # X-Scope-OrgID 헤더로 테넌트 구분
+
+runtime_config:
+  file: /etc/loki/runtime-config.yaml
+  period: 10s
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: info
+  grpc_server_max_concurrent_streams: 100  # 동시 스트림 제한
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory  # 클러스터로 구성할 경우 consul, etcd 권장
+
+schema_config:
+  configs:
+    - from: 2025-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+storage_config:
+  tsdb_shipper:
+    active_index_directory: /loki/tsdb-index
+    cache_location: /loki/tsdb-cache
+  filesystem:
+    directory: /loki/chunks
+
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 30m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 50
+  delete_request_store: filesystem
+
+limits_config:
+  # Retention 설정
+  retention_period: 168h  # 24*7 보관
+
+  # Ingestion 제한
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  ingestion_rate_mb: 5
+  ingestion_burst_size_mb: 10
+
+  # Labels & Series 제한
+  max_label_names_per_series: 15
+  max_query_series: 200
+  max_query_parallelism: 16
+
+  # 기타 기능 활성화
+  allow_structured_metadata: true    # OpenTelemetry 로그 속성 지원
+  volume_enabled: true               # Grafana 볼륨 분석 활성화
+  metric_aggregation_enabled: true   # 로그에서 메트릭 생성 가능
+
+pattern_ingester:
+  enabled: true
+  metric_aggregation:
+    loki_address: localhost:3100
+
+query_range:
+  align_queries_with_step: true
+  max_retries: 5
+  cache_results: true
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 50
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  rule_path: /loki/rules-temp
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
+  enable_alertmanager_discovery: true
+  enable_alertmanager_v2: true
+
+distributor:
+  otlp_config:
+    default_resource_attributes_as_index_labels:
+      - service.name
+      - deployment.environment
+
+frontend:
+  encoding: protobuf

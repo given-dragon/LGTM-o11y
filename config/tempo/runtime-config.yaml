@@ -1,0 +1,47 @@
+# Tempo Runtime Configuration - Per-Tenant Overrides
+# 공식 문서: https://grafana.com/docs/tempo/latest/configuration/
+
+overrides:
+  "caro-backend-prod":
+    ingestion:
+      rate_limit_bytes: 15000000  # 15MB
+      burst_size_bytes: 20000000  # 20MB
+      max_traces_per_user: 10000
+
+    read:
+      max_bytes_per_tag_values_query: 1000000  # 1MB
+      max_search_duration: 168h
+
+    compaction:
+      block_retention: 336h  # 14일
+
+    global:
+      max_bytes_per_trace: 5000000    # 5MB
+
+    metrics_generator:
+      processors:
+        - service-graphs
+        - span-metrics
+      max_active_series: 50000
+
+  "caro-backend-staging":
+    ingestion:
+      rate_limit_bytes: 5000000
+      burst_size_bytes: 10000000
+      max_traces_per_user: 5000
+
+    read:
+      max_bytes_per_tag_values_query: 1000000
+      max_search_duration: 72h
+
+    compaction:
+      block_retention: 168h
+
+    global:
+      max_bytes_per_trace: 3000000
+
+    metrics_generator:
+      processors:
+        - service-graphs
+        - span-metrics
+      max_active_series: 20000

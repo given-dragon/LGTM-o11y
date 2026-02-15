@@ -1,0 +1,293 @@
+# Observability Stack - Caro Demo
+
+Grafana Stack 기반의 프로덕션 레디 관측 가능성(Observability) 인프라. Spring Boot 마이크로서비스를 위한 메트릭, 로그, 트레이스를 수집하고 시각화한다.
+
+## 아키텍처
+
+```
+Caro-Demo Application (Spring Boot 4 + OpenTelemetry)
+    |
+    | OTLP (HTTP :4318)
+    v
+  Alloy (Unified Collector)
+    |
+    +---> Loki    (Logs)     :3100
+    +---> Mimir   (Metrics)  :9009
+    +---> Tempo   (Traces)   :3200
+    |
+    v
+  Grafana (Dashboard)        :3000
+    |
+    v
+  Alertmanager --> Slack
+```
+
+### 핵심 컴포넌트
+
+| 서비스 | 역할 | 포트 |
+|--------|------|------|
+| **Grafana** | 대시보드 및 시각화 | 3000 |
+| **Loki** | 로그 수집 및 검색 | 3100 |
+| **Tempo** | 분산 트레이싱 | 3200 |
+| **Mimir** | 메트릭 저장 (Prometheus 호환) | 9009 |
+| **Alloy** | 통합 데이터 수집기 (OTLP) | 12345 |
+| **Caro-Demo** | Spring Boot 데모 애플리케이션 | 8080 |
+
+### 멀티 테넌시
+
+모든 백엔드(Loki, Tempo, Mimir)는 `X-Scope-OrgID` 헤더를 통한 멀티 테넌시를 지원한다.
+
+| 테넌트 | 용도 | 메트릭 보존 | 트레이스 보존 |
+|--------|------|-------------|---------------|
+| `caro-backend-prod` | 프로덕션 환경 | 15일 | 14일 |
+| `caro-backend-staging` | 스테이징 환경 | 7일 | 7일 |
+| `infra-monitoring` | Alloy 셀프 모니터링 | - | - |
+
+## 빠른 시작
+
+### 사전 요구사항
+
+- Docker & Docker Compose
+- (선택) JDK 24 + Gradle 8 (caro-demo 로컬 개발 시)
+
+### 실행
+
+```bash
+# 1. 환경 변수 설정
+cp .env.example .env
+
+# 2. 전체 스택 실행
+docker compose up -d
+
+# 3. 서비스 상태 확인
+docker compose ps
+```
+
+### 접속
+
+| 서비스 | URL | 인증 |
+|--------|-----|------|
+| Grafana | http://localhost:3000 | admin / admin |
+| Alloy UI | http://localhost:12345 | - |
+| Caro-Demo | http://localhost:8080 | - |
+| Caro-Demo Actuator | http://localhost:9090/actuator | - |
+
+## 환경 변수
+
+| 변수 | 기본값 | 설명 |
+|------|--------|------|
+| `GRAFANA_ADMIN_USER` | `admin` | Grafana 관리자 계정 |
+| `GRAFANA_ADMIN_PASSWORD` | `admin` | Grafana 관리자 비밀번호 |
+| `GRAFANA_PORT` | `3000` | Grafana 포트 |
+| `LOKI_PORT` | `3100` | Loki HTTP API 포트 |
+| `TEMPO_PORT` | `3200` | Tempo HTTP API 포트 |
+| `TEMPO_OTLP_GRPC_PORT` | `4317` | Tempo OTLP gRPC 포트 |
+| `MIMIR_PORT` | `9009` | Mimir HTTP API 포트 |
+| `ALLOY_PORT` | `12345` | Alloy UI 포트 |
+| `ALLOY_OTLP_HTTP_PORT` | `4318` | Alloy OTLP HTTP 수신 포트 |
+| `ALERTMANAGER_PORT` | `9093` | Alertmanager 포트 |
+| `CARO_DEMO_PORT` | `8080` | Caro-Demo 애플리케이션 포트 |
+| `SLACK_WEBHOOK_URL` | (비어 있음) | Slack 알림 웹훅 URL |
+| `ALERT_EMAIL_TO` | (비어 있음) | 알림 수신 이메일 |
+| `ALERT_EMAIL_FROM` | (비어 있음) | 알림 발신 이메일 |
+| `ENVIRONMENT` | `development` | 실행 환경 |
+
+## 프로젝트 구조
+
+```
+o11y/
+├── docker-compose.yaml          # 서비스 오케스트레이션
+├── .env.example                 # 환경 변수 템플릿
+├── config/
+│   ├── alloy/
+│   │   └── config.alloy         # OTLP 수신 및 라우팅 설정
+│   ├── grafana/
+│   │   ├── datasources.yaml     # 데이터소스 정의 (테넌트별)
+│   │   ├── dashboards.yaml      # 대시보드 프로비저닝
+│   │   └── dashboards/          # 대시보드 JSON 파일
+│   ├── loki/
+│   │   ├── loki.yaml            # 로그 수집 설정
+│   │   └── runtime-config.yaml  # 테넌트별 오버라이드
+│   ├── mimir/
+│   │   ├── mimir.yaml           # 메트릭 저장 설정
+│   │   ├── runtime-config.yaml  # 테넌트별 오버라이드
+│   │   ├── rules/               # 알림 규칙 (테넌트별)
+│   │   └── alertmanager-tenants/# Alertmanager 설정 (테넌트별)
+│   └── tempo/
+│       ├── tempo.yaml           # 트레이싱 설정
+│       └── runtime-config.yaml  # 테넌트별 오버라이드
+├── data/                        # 런타임 데이터 (Docker 볼륨)
+└── caro-demo/                   # Spring Boot 데모 애플리케이션
+```
+
+## 설정 상세
+
+### Alloy (데이터 수집기)
+
+Alloy는 OTLP 프로토콜로 애플리케이션의 텔레메트리 데이터를 수신하여 각 백엔드로 라우팅한다.
+
+- **수신**: OTLP gRPC (`:4317`), OTLP HTTP (`:4318`)
+- **메모리 제한**: 512MB (스파이크 버퍼 20%)
+- **배치 처리**: `tenant_id` 기반 테넌트별 배칭
+- **재시도 정책**: 1초~30초 간격, 최대 5분
+
+### Loki (로그)
+
+- **스키마**: v13 TSDB (2025-01-01~)
+- **보존 기간**: 168시간 (7일)
+- **구조화된 메타데이터** 지원
+- **패턴 인제스터** 활성화
+
+### Tempo (트레이싱)
+
+- **저장소**: 로컬 파일시스템
+- **메트릭 생성기**: 서비스 그래프, 스팬 메트릭 (Mimir로 내보내기)
+- **보존 기간**: 프로덕션 14일 / 스테이징 7일
+
+### Mimir (메트릭)
+
+- **타겟**: all, alertmanager
+- **저장소**: 파일시스템
+- **Ruler**: 1분마다 평가
+- **테넌트별 제한**:
+  - 프로덕션: 인제스션 10,000 req/s, 최대 시리즈 50,000
+  - 스테이징: 인제스션 5,000 req/s, 최대 시리즈 20,000
+
+### Grafana 데이터소스
+
+| 데이터소스 | UID | 테넌트 |
+|-----------|-----|--------|
+| Loki-Staging | `loki-staging` | `caro-backend-staging` |
+| Loki-Prod | `loki-prod` | `caro-backend-prod` |
+| Tempo-Staging | `tempo-staging` | `caro-backend-staging` |
+| Tempo-Prod | `tempo-prod` | `caro-backend-prod` |
+| Mimir-Staging (기본) | `mimir-staging` | `caro-backend-staging` |
+| Mimir-Prod | `mimir-prod` | `caro-backend-prod` |
+| Mimir-Infra | `mimir-infra` | `infra-monitoring` |
+
+상관 관계 설정:
+- Tempo -> Loki: 트레이스에서 관련 로그 조회
+- Tempo -> Mimir: 트레이스에서 관련 메트릭 조회
+- Exemplar: 메트릭에서 트레이스로 연결
+
+## 알림 (Alerting)
+
+### 알림 규칙
+
+`config/mimir/rules/` 디렉토리에 테넌트별 알림 규칙을 정의한다.
+
+현재 스테이징 환경에 설정된 규칙:
+
+| 규칙 | 조건 | 심각도 |
+|------|------|--------|
+| `CaroDemoDown` | 2분간 메트릭 수신 없음 | critical |
+| `HighHTTPErrorRate` | 5분간 5xx 오류율 > 5% | warning |
+
+### Slack 알림 설정
+
+1. `.env`에 `SLACK_WEBHOOK_URL`을 설정한다
+2. 알림은 심각도별로 다른 채널로 라우팅된다:
+   - Critical: `#staging-critical` / `#prod-critical`
+   - Warning: `#staging-warnings` / `#prod-warnings`
+   - Default: `#staging-alerts` / `#prod-alerts`
+
+## Caro-Demo 애플리케이션
+
+Spring Boot 4 + Spring Modulith 기반의 플래시카드 학습 플랫폼 데모.
+
+### 기술 스택
+
+- **Kotlin** 2.2 + **Java** 24
+- **Spring Boot** 4.0.1 + **Spring Modulith** 2.0.1
+- **OpenTelemetry** (spring-boot-starter-opentelemetry)
+- **H2** (로컬 개발) / **MySQL** (프로덕션)
+
+### 모듈 구성
+
+| 모듈 | 설명 | 이벤트 |
+|------|------|--------|
+| **Workbook** | 덱 & 카드 관리 | - |
+| **Review** | 간격 반복 학습 (SM-2) | `CardReviewedEvent` 발행 |
+| **Ingestion** | AI 기반 카드 생성 | - |
+| **Gamification** | 스트릭, 경험치, 뱃지 | `CardReviewedEvent` 구독 |
+| **Analytics** | 일일 학습 통계 | `CardReviewedEvent` 구독 |
+| **Notification** | 목표 달성 알림 | `CardReviewedEvent` 구독 |
+| **Member** | 사용자 관리 | - |
+| **Observatory** | 관측 가능성/모니터링 | - |
+| **Shared** | 공통 인프라 (보안, 에러 처리, Swagger) | - |
+
+자세한 내용은 [caro-demo/README.md](./caro-demo/README.md) 참조.
+
+## 데이터 흐름
+
+```
+[Caro-Demo]
+    |
+    | OTLP HTTP (metrics, logs, traces)
+    v
+[Alloy] --- tenant_id 라우팅 (X-Scope-OrgID) ---
+    |                    |                    |
+    v                    v                    v
+[Loki]              [Mimir]              [Tempo]
+ 로그 저장           메트릭 저장           트레이스 저장
+    |                    |                    |
+    +--------+-----------+--------------------+
+             |
+             v
+         [Grafana]
+     대시보드 & 알림
+             |
+             v
+    [Alertmanager] --> [Slack]
+```
+
+## 운영
+
+### 로그 확인
+
+```bash
+# 전체 서비스 로그
+docker compose logs -f
+
+# 특정 서비스 로그
+docker compose logs -f alloy
+docker compose logs -f caro-demo
+```
+
+### 서비스 재시작
+
+```bash
+# 특정 서비스 재시작
+docker compose restart alloy
+
+# 설정 변경 후 재생성
+docker compose up -d --force-recreate alloy
+```
+
+### 데이터 초기화
+
+```bash
+# 전체 스택 중지 및 데이터 삭제
+docker compose down -v
+rm -rf data/*
+
+# 다시 시작
+docker compose up -d
+```
+
+### 리소스 모니터링
+
+```bash
+docker stats
+```
+
+## 트러블슈팅
+
+| 증상 | 확인 사항 |
+|------|-----------|
+| Grafana에 데이터 없음 | Alloy UI (`localhost:12345`)에서 파이프라인 상태 확인 |
+| 메트릭 누락 | Mimir 로그에서 테넌트 ID 일치 여부 확인 |
+| 트레이스 누락 | Caro-Demo의 `OTLP_ENDPOINT` 환경 변수 확인 |
+| 알림 미작동 | `SLACK_WEBHOOK_URL` 설정 및 Alertmanager 로그 확인 |
+| 서비스 시작 실패 | `docker compose logs <서비스명>`으로 에러 확인 |
+| 포트 충돌 | `.env`에서 포트 번호 변경 |

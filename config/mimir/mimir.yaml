@@ -1,0 +1,162 @@
+# Mimir Configuration - Single Process Mode (Monolithic)
+# 공식 문서: https://grafana.com/docs/mimir/latest/
+
+target: all,alertmanager
+multitenancy_enabled: true
+
+runtime_config:
+  file: /etc/mimir/runtime-config.yaml
+  period: 10s
+
+server:
+  http_listen_port: 9009
+  grpc_listen_port: 9095
+  log_level: info
+  log_format: logfmt
+  grpc_server_max_recv_msg_size: 104857600  # 100MB
+  grpc_server_max_send_msg_size: 104857600  # 100MB
+  http_server_write_timeout: 2m
+  http_server_read_timeout: 2m
+
+common:
+  storage:
+    backend: filesystem
+    filesystem:
+      dir: /data/tsdb
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+  tsdb:
+    dir: /data/tsdb
+    retention_period: 13h
+    block_ranges_period:
+      - 2h
+  bucket_store:
+    sync_dir: /data/tsdb-sync
+
+compactor:
+  data_dir: /data/compactor
+  compaction_interval: 30m
+  deletion_delay: 12h
+  max_closing_blocks_concurrency: 1
+  max_opening_blocks_concurrency: 1
+  symbols_flushers_concurrency: 1
+  cleanup_interval: 15m
+  tenant_cleanup_delay: 1h
+  first_level_compaction_wait_period: 25m
+  sharding_ring:  # Compactor sharding (단일 노드에서도 필요)
+    kvstore:
+      store: inmemory
+
+distributor:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory  # memberlist 권장
+  pool:
+    health_check_ingesters: true
+
+ingester:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory  # memberlist 권장
+    replication_factor: 1
+    num_tokens: 128
+
+# Ingester client 설정 (Distributor → Ingester 통신)
+ingester_client:
+  grpc_client_config:
+    max_recv_msg_size: 104857600  # 100MB
+    max_send_msg_size: 104857600  # 100MB
+    grpc_compression: gzip
+
+store_gateway:
+  sharding_ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory  # memberlist 권장
+    replication_factor: 1
+
+ruler:
+  enable_api: true
+  rule_path: /data/ruler-temp
+  alertmanager_url: http://localhost:9009/alertmanager  # Mimir Alertmanager 사용 시 /alertmanager prefix 필요
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+  evaluation_interval: 1m
+  poll_interval: 1m
+
+ruler_storage:
+  backend: local
+  local:
+    directory: /etc/mimir/rules  # Tenant별 디렉터리: /etc/mimir/rules/${TENANT_ID}/
+
+# Alertmanager 설정
+# 공식 문서: https://grafana.com/docs/mimir/latest/references/architecture/components/alertmanager/
+alertmanager:
+  data_dir: /data/alertmanager
+  enable_api: true
+  external_url: /alertmanager
+  sharding_ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+    replication_factor: 2  # RF=1 버그 우회를 위해 1초과로 설정 (github issue: grafana/mimir#2910)
+
+alertmanager_storage:
+  backend: local
+  local:
+    path: /etc/mimir/alertmanager-tenants
+
+limits:
+  ingestion_rate: 10000
+  ingestion_burst_size: 200000
+  compactor_blocks_retention_period: 15d
+
+  max_global_series_per_user: 50000
+  max_global_series_per_metric: 0
+  max_global_exemplars_per_user: 10000
+
+  # Label 제한
+  max_label_names_per_series: 30
+  max_label_name_length: 1024
+  max_label_value_length: 2048
+
+  # Query 제한
+  max_query_parallelism: 8
+  max_total_query_length: 15d
+  max_partial_query_length: 7d
+
+  # 추가 기능
+  native_histograms_ingestion_enabled: true
+  max_native_histogram_buckets: 160
+  out_of_order_time_window: 30m
+
+  # Cache 설정
+  max_cache_freshness: 1m
+
+  otel_metric_suffixes_enabled: true
+
+querier:
+  max_concurrent: 8  # 전체 tenent 합산이므로, 병목 발생 시 16으로 상향 필요
+  timeout: 2m
+
+query_scheduler:
+  max_outstanding_requests_per_tenant: 100
+
+frontend:
+  log_queries_longer_than: 5s
+  max_outstanding_per_tenant: 100
+  split_queries_by_interval: 24h
+  # Results Cache: inmemory는 지원 중단됨 (memcached, redis만 지원)
+  # 개발 환경에서는 캐시 비활성화 (필요 시 memcached/redis 사용)
+  # cache_results: true
+  # results_cache:
+  #   backend: memcached
+  #   memcached:
+  #     addresses: memcached:11211

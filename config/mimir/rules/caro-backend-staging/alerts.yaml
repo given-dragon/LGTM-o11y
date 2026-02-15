@@ -1,0 +1,53 @@
+# Mimir Alert Rules
+# 공식 문서: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
+
+groups:
+  # 그룹 1: 기본 테스트 알림
+  - name: test_alerts
+    interval: 30s  # 30초마다 규칙 평가
+    rules:
+      # 규칙 1: 항상 발생하는 테스트 알림
+      - alert: TestAlertAlwaysFiring
+        expr: vector(1)
+        for: 1m          # 1분 동안 조건이 유지되면 알림 발생
+        labels:
+          severity: warning
+          service: test-service
+          cluster: local
+        annotations:
+          summary: "테스트 알림: Alertmanager 연동 확인"
+          description: "이 알림은 Alertmanager 설정이 올바른지 확인하기 위한 테스트 알림입니다. Slack에서 이 메시지를 받으면 설정이 정상적으로 작동하는 것입니다."
+
+  # 그룹 2: Caro Demo 모니터링 알림
+  - name: caro_demo_alerts
+    interval: 30s
+    rules:
+      # 규칙 2: Caro Demo가 다운되었을 때
+      # OTLP push 방식이라 up 메트릭이 없으므로 absent() 사용
+      - alert: CaroDemoDown
+        expr: absent(http_server_requests_milliseconds_count{job="caro-demo-app"})
+        for: 2m
+        labels:
+          severity: critical
+          service: caro-demo-app
+          cluster: local
+        annotations:
+          summary: "Caro Demo가 다운되었습니다"
+          description: "Caro Demo에서 2분 이상 HTTP 메트릭이 수신되지 않습니다. 즉시 확인이 필요합니다."
+
+      # 규칙 3: HTTP 요청 실패율이 높을 때
+      - alert: HighHTTPErrorRate
+        expr: |
+          (
+            sum(rate(http_server_requests_milliseconds_count{job="caro-demo-app",status=~"5.."}[5m]))
+            /
+            sum(rate(http_server_requests_milliseconds_count{job="caro-demo-app"}[5m]))
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: caro-demo-app
+          cluster: local
+        annotations:
+          summary: "HTTP 5xx 에러율이 높습니다"
+          description: "최근 5분간 HTTP 5xx 에러율이 {{ $value | humanize }}%입니다. 정상 범위는 5% 미만입니다."

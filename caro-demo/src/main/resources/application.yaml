@@ -1,0 +1,54 @@
+# 공통 설정
+spring:
+  application:
+    name: ${OTEL_SERVICE_NAME:caro-demo-app}
+  profiles:
+    active: local  # 기본 profile을 local
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  jpa:
+    open-in-view: false  # OSIV off
+  jackson:
+    time-zone: UTC
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  server:
+    port: 9090
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  otlp:
+    metrics:
+      export:
+        url: ${OTLP_ENDPOINT:http://localhost:4318}/v1/metrics
+        step: 15s
+        headers:
+          tenant_id: ${TENANT_ID:caro-backend-staging}
+  opentelemetry:
+    logging:
+      export:
+        otlp:
+          endpoint: ${OTLP_ENDPOINT:http://localhost:4318}/v1/logs
+          transport: http
+          headers:
+            tenant_id: ${TENANT_ID:caro-backend-staging}
+    tracing:
+      export:
+        otlp:
+          transport: http
+          endpoint: ${OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+          headers:
+            tenant_id: ${TENANT_ID:caro-backend-staging}
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      enabled: true

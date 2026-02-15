@@ -1,0 +1,186 @@
+apiVersion: 1
+
+# ============================================================
+# Loki Datasource
+# ============================================================
+datasources:
+  - name: Loki-Staging
+    type: loki
+    uid: loki-staging
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    editable: true
+    jsonData:
+      httpMethod: GET
+      maxLines: 1000
+      httpHeaderName1: "X-Scope-OrgID"
+      derivedFields:
+        - datasourceUid: tempo-staging
+          matcherType: "label"
+          matcherRegex: "trace_id"
+          name: TraceID
+          url: "$${__value.raw}"
+          urlDisplayLabel: "View Trace"
+    secureJsonData:
+      httpHeaderValue1: "caro-backend-staging"
+
+  - name: Loki-Prod
+    type: loki
+    uid: loki-prod
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    editable: true
+    jsonData:
+      httpMethod: GET
+      maxLines: 1000
+      httpHeaderName1: "X-Scope-OrgID"
+      derivedFields:
+        - datasourceUid: tempo-prod
+          matcherType: "label"
+          matcherRegex: "trace_id"
+          name: TraceID
+          url: "$${__value.raw}"
+          urlDisplayLabel: "View Trace"
+    secureJsonData:
+      httpHeaderValue1: "caro-backend-prod"
+
+# ============================================================
+# Tempo Datasource
+# ============================================================
+  - name: Tempo-Staging
+    type: tempo
+    uid: tempo-staging
+    access: proxy
+    url: http://tempo:3200
+    isDefault: false
+    editable: true
+    jsonData:
+      httpMethod: GET
+      httpHeaderName1: "X-Scope-OrgID"
+      tracesToLogsV2:
+        datasourceUid: loki-staging
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        filterByTraceID: false
+        filterBySpanID: false
+        customQuery: true
+        # Spring Modulith가 span의 service.name을 모듈명으로 변경하므로 범용 셀렉터 + trace_id structured metadata 필터 사용
+        query: "{service_name=~\".+\"} | trace_id = \"$${__trace.traceId}\""
+      tracesToMetrics:
+        datasourceUid: mimir-staging
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        tags:
+          - key: service.name
+            value: service
+        queries:
+          - name: "Request rate"
+            query: "sum(rate(traces_spanmetrics_calls_total{$$__tags}[5m]))"
+          - name: "Error rate"
+            query: "sum(rate(traces_spanmetrics_calls_total{$$__tags, status_code=\"STATUS_CODE_ERROR\"}[5m]))"
+          - name: "Duration (p95)"
+            query: "histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m])) by (le))"
+      serviceMap:
+        datasourceUid: mimir-staging
+      nodeGraph:
+        enabled: true
+      lokiSearch:
+        datasourceUid: loki-staging
+    secureJsonData:
+      httpHeaderValue1: "caro-backend-staging"
+
+  - name: Tempo-Prod
+    type: tempo
+    uid: tempo-prod
+    access: proxy
+    url: http://tempo:3200
+    isDefault: false
+    editable: true
+    jsonData:
+      httpMethod: GET
+      httpHeaderName1: "X-Scope-OrgID"
+      tracesToLogsV2:
+        datasourceUid: loki-prod
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        filterByTraceID: false
+        filterBySpanID: false
+        customQuery: true
+        query: "{service_name=~\".+\"} | trace_id = \"$${__trace.traceId}\""
+      tracesToMetrics:
+        datasourceUid: mimir-prod
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        tags:
+          - key: service.name
+            value: service
+        queries:
+          - name: "Request rate"
+            query: "sum(rate(traces_spanmetrics_calls_total{$$__tags}[5m]))"
+          - name: "Error rate"
+            query: "sum(rate(traces_spanmetrics_calls_total{$$__tags, status_code=\"STATUS_CODE_ERROR\"}[5m]))"
+          - name: "Duration (p95)"
+            query: "histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m])) by (le))"
+      serviceMap:
+        datasourceUid: mimir-prod
+      nodeGraph:
+        enabled: true
+      lokiSearch:
+        datasourceUid: loki-prod
+    secureJsonData:
+      httpHeaderValue1: "caro-backend-prod"
+
+# ============================================================
+# Mimir Datasource
+# ============================================================
+  - name: Mimir-Staging
+    type: prometheus
+    uid: mimir-staging
+    access: proxy
+    url: http://mimir:9009/prometheus
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+      timeout: 120
+      httpHeaderName1: "X-Scope-OrgID"
+      exemplarTraceIdDestinations:
+        - datasourceUid: tempo-staging
+          name: TraceID
+    secureJsonData:
+      httpHeaderValue1: "caro-backend-staging"
+
+  - name: Mimir-Prod
+    type: prometheus
+    uid: mimir-prod
+    access: proxy
+    url: http://mimir:9009/prometheus
+    isDefault: false
+    editable: true
+    jsonData:
+      httpMethod: POST
+      timeout: 120
+      httpHeaderName1: "X-Scope-OrgID"
+      exemplarTraceIdDestinations:
+        - datasourceUid: tempo-prod
+          name: TraceID
+    secureJsonData:
+      httpHeaderValue1: "caro-backend-prod"
+
+  # Mimir-Infra: metrics-only 테넌트 (Alloy self-monitoring)
+  # Loki-Infra/Tempo-Infra는 의도적으로 생략 — infra 테넌트에는 로그/트레이스를 라우팅하지 않음
+  - name: Mimir-Infra
+    type: prometheus
+    uid: mimir-infra
+    access: proxy
+    url: http://mimir:9009/prometheus
+    isDefault: false
+    editable: true
+    jsonData:
+      httpMethod: POST
+      timeout: 120
+      httpHeaderName1: "X-Scope-OrgID"
+    secureJsonData:
+      httpHeaderValue1: "infra-monitoring"

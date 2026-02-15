@@ -1,0 +1,133 @@
+// ============================================================
+// Auth — 동적 tenant 라우팅
+// ============================================================
+otelcol.auth.headers "tenant" {
+  header {
+    key          = "X-Scope-OrgID"
+    from_context = "tenant_id"
+    action       = "upsert"
+  }
+}
+
+// ============================================================
+// OTLP Pipeline
+// ============================================================
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint         = "0.0.0.0:4317"
+    include_metadata = true
+  }
+  http {
+    endpoint         = "0.0.0.0:4318"
+    include_metadata = true
+  }
+  output {
+    logs    = [otelcol.processor.memory_limiter.default.input]
+    metrics = [otelcol.processor.memory_limiter.default.input]
+    traces  = [otelcol.processor.memory_limiter.default.input]
+  }
+}
+
+otelcol.processor.memory_limiter "default" {
+  check_interval         = "1s"
+  limit                  = "512MiB"
+  spike_limit_percentage = 20
+  output {
+    logs    = [otelcol.processor.batch.default.input]
+    metrics = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  timeout                    = "5s"
+  send_batch_size            = 1024
+  send_batch_max_size        = 2048
+
+  metadata_keys              = ["tenant_id"]  // tenant별 batch instance 생성
+  metadata_cardinality_limit = 20  // 동시에 존재 가능한 batch instance의 상한
+  output {
+    logs    = [otelcol.exporter.otlphttp.loki.input]
+    metrics = [otelcol.exporter.otlphttp.mimir.input]
+    traces  = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// 3개 exporter의 sending_queue/retry_on_failure는 동일한 정책을 공유
+// 변경 시 loki, mimir, tempo 모두 일괄 수정 필요.
+otelcol.exporter.otlphttp "loki" {
+  client {
+    endpoint = "http://loki:3100/otlp"
+    auth     = otelcol.auth.headers.tenant.handler
+  }
+  sending_queue {
+    enabled          = true
+    queue_size       = 5000
+    num_consumers    = 4
+  }
+  retry_on_failure {
+    enabled          = true
+    initial_interval = "1s"
+    max_interval     = "30s"
+    max_elapsed_time = "5m"
+  }
+}
+
+otelcol.exporter.otlphttp "mimir" {
+  client {
+    endpoint = "http://mimir:9009/otlp"
+    auth     = otelcol.auth.headers.tenant.handler
+  }
+  sending_queue {
+    enabled          = true
+    queue_size       = 5000
+    num_consumers    = 4
+  }
+  retry_on_failure {
+    enabled          = true
+    initial_interval = "1s"
+    max_interval     = "30s"
+    max_elapsed_time = "5m"
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    auth     = otelcol.auth.headers.tenant.handler
+    tls {
+      insecure = true
+    }
+  }
+  sending_queue {
+    enabled          = true
+    queue_size       = 5000
+    num_consumers    = 4
+  }
+  retry_on_failure {
+    enabled          = true
+    initial_interval = "1s"
+    max_interval     = "30s"
+    max_elapsed_time = "5m"
+  }
+}
+
+// ============================================================
+// Alloy Self-Monitoring (static 헤더 유지)
+// ============================================================
+prometheus.scrape "alloy" {
+  targets = [{
+    __address__ = "localhost:12345",
+    job         = "alloy",
+  }]
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://mimir:9009/api/v1/push"
+    headers = {
+      "X-Scope-OrgID" = "infra-monitoring",
+    }
+  }
+}

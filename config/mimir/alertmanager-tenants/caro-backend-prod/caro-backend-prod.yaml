@@ -1,0 +1,73 @@
+# Alertmanager Configuration - caro-backend-prod
+
+global:
+  resolve_timeout: 5m
+  slack_api_url: 'https://hooks.slack.com/services/REPLACE_ME'  # 슬랙 hook api를 넣어주세요
+
+route:
+  receiver: 'slack-prod'
+  group_by: ['alertname', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    # Critical 알림 - 즉시
+    - matchers:
+        - severity = critical
+      receiver: 'slack-prod-critical'
+      group_wait: 10s
+      repeat_interval: 15m
+
+    # Warning 알림
+    - matchers:
+        - severity = warning
+      receiver: 'slack-prod-warning'
+      group_wait: 30s
+      repeat_interval: 1h
+
+receivers:
+  # 기본 수신자
+  - name: 'slack-prod'
+    slack_configs:
+      - channel: '#prod-alerts'
+        title: '[PRODUCTION] 🔔 {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Environment:* **PRODUCTION** 🚨
+        send_resolved: true
+
+  # Critical 알림 - 즉시 대응 필요
+  - name: 'slack-prod-critical'
+    slack_configs:
+      - channel: '#prod-critical'
+        title: '[PRODUCTION] 🚨🚨🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Service:* {{ .CommonLabels.service }}
+          *Environment:* **PRODUCTION**
+
+          @channel 즉시 확인이 필요합니다!
+        color: 'danger'
+        send_resolved: true
+
+  # Warning 알림
+  - name: 'slack-prod-warning'
+    slack_configs:
+      - channel: '#prod-warnings'
+        title: '[PRODUCTION] ⚠️ Warning: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Environment:* production
+        color: 'warning'
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal: ['alertname', 'service']

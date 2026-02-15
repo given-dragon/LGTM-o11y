@@ -1,0 +1,39 @@
+# Loki Runtime Configuration - Per-Tenant Overrides
+# 공식 문서: https://grafana.com/docs/loki/latest/operations/storage/retention/
+#
+# 이 파일은 Loki 재시작 없이 동적으로 로드됩니다.
+
+overrides:
+  "caro-backend-prod":  # Production 환경
+    # limits_config:
+    retention_period: 168h
+
+    ingestion_rate_mb: 5
+    ingestion_burst_size_mb: 10
+
+    max_query_series: 200
+    max_query_parallelism: 16
+    max_query_lookback: 168h
+
+    max_label_names_per_series: 15
+    max_streams_per_user: 10000
+
+    reject_old_samples: true
+    reject_old_samples_max_age: 336h
+
+  "caro-backend-staging":  # Staging 환경
+    # limits_config:
+    retention_period: 72h
+
+    ingestion_rate_mb: 3
+    ingestion_burst_size_mb: 6
+
+    max_query_series: 100
+    max_query_parallelism: 8
+    max_query_lookback: 72h
+
+    max_label_names_per_series: 10
+    max_streams_per_user: 5000
+
+    reject_old_samples: true
+    reject_old_samples_max_age: 336h

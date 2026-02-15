@@ -1,0 +1,78 @@
+# Tempo Configuration - Single Binary Mode (Monolithic)
+# 공식 문서: https://grafana.com/docs/tempo/latest/configuration/
+
+stream_over_http_enabled: true
+multitenancy_enabled: true
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+  log_level: info
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        # docker network 내부 접근
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  max_block_duration: 5m
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+    pool:
+      max_workers: 100
+      queue_depth: 10000
+    search:
+      read_buffer_count: 16
+      read_buffer_size_bytes: 1048576
+
+query_frontend:
+  search:
+    max_duration: 168h  # 24h * 7
+    concurrent_jobs: 100
+    target_bytes_per_job: 104857600  # 100MB
+    query_ingesters_until: 30m  # > max_block_duration(5m) + complete_block_timeout(기본값 15m)
+  trace_by_id:
+    query_shards: 15
+  max_outstanding_per_tenant: 200  # 내부 큐에 대기중일 job까지 포함하여 2배로 설정
+
+querier:
+  max_concurrent_queries: 10
+
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: local
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write_add_org_id_header: true  # 멀티테넌시에서 `X-Scope-OrgID` 자동 전달
+    remote_write:
+      - url: http://mimir:9009/api/v1/push
+        send_exemplars: true
+
+overrides:
+  per_tenant_override_config: /etc/tempo/runtime-config.yaml
+  per_tenant_override_period: 10s
+  defaults:
+    compaction:
+      block_retention: 168h
+    metrics_generator:
+      processors:
+        - service-graphs
+        - span-metrics

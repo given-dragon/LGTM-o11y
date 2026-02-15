@@ -1,0 +1,142 @@
+networks:
+  observability:
+    driver: bridge
+
+services:
+  # Grafana - Visualization and Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+      - ./config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./config/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - observability
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      loki:
+        condition: service_started # Changed from service_healthy
+      tempo:
+        condition: service_started # Changed from service_healthy
+      mimir:
+        condition: service_started # Changed from service_healthy
+
+  # Loki - Log Aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    command: -config.file=/etc/loki/loki.yaml
+    volumes:
+      - ./config/loki/loki.yaml:/etc/loki/loki.yaml
+      - ./config/loki/runtime-config.yaml:/etc/loki/runtime-config.yaml
+      - ./data/loki:/loki
+    networks:
+      - observability
+    healthcheck:
+      test: [ "CMD", "/usr/bin/loki", "-health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Tempo - Distributed Tracing
+  tempo:
+    image: grafana/tempo:2.10.0
+    container_name: tempo
+    restart: unless-stopped
+    ports:
+      - "${TEMPO_PORT:-3200}:3200" # Tempo HTTP API
+    command: -config.file=/etc/tempo/tempo.yaml
+    volumes:
+      - ./config/tempo/tempo.yaml:/etc/tempo/tempo.yaml
+      - ./config/tempo/runtime-config.yaml:/etc/tempo/runtime-config.yaml
+      - ./data/tempo:/var/tempo
+    networks:
+      - observability
+
+  # Mimir - Metrics Storage (Prometheus compatible)
+  mimir:
+    image: grafana/mimir:latest
+    container_name: mimir
+    restart: unless-stopped
+    ports:
+      - "${MIMIR_PORT:-9009}:9009"
+    command: -config.file=/etc/mimir/mimir.yaml
+    volumes:
+      - ./config/mimir/mimir.yaml:/etc/mimir/mimir.yaml
+      - ./config/mimir/runtime-config.yaml:/etc/mimir/runtime-config.yaml
+      - ./config/mimir/rules:/etc/mimir/rules:ro
+      - ./config/mimir/alertmanager-tenants:/etc/mimir/alertmanager-tenants:ro
+      - ./data/mimir:/data
+    networks:
+      - observability
+
+  # Alloy - Unified Data Collector
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy
+    restart: unless-stopped
+    ports:
+      - "${ALLOY_PORT:-12345}:12345" # Alloy UI
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    volumes:
+      - ./data/alloy:/var/lib/alloy
+      - ./config/alloy/config.alloy:/etc/alloy/config.alloy
+    networks:
+      - observability
+    depends_on:
+      loki:
+        condition: service_started # Changed from service_healthy
+      tempo:
+        condition: service_started # Changed from service_healthy
+      mimir:
+        condition: service_started # Changed from service_healthy
+
+  # Caro Demo - Spring Boot 4 + Spring Modulith + OpenTelemetry (Metrics & Traces via OTLP)
+  caro-demo:
+    build:
+      context: ./caro-demo
+      dockerfile: Dockerfile
+    container_name: caro-demo
+    restart: unless-stopped
+    ports:
+      - "${CARO_DEMO_PORT:-8080}:8080"
+    environment:
+      # OTLP endpoint: Alloy receives via HTTP (4318) and forwards to Mimir/Tempo
+      - OTLP_ENDPOINT=http://alloy:4318
+      - OTEL_SERVICE_NAME=caro-demo-app
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment=staging
+      - TENANT_ID=caro-backend-staging
+    networks:
+      - observability
+    depends_on:
+      alloy:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
