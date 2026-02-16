@@ -31,36 +31,40 @@ receivers:
   - name: 'slack-staging'
     slack_configs:
       - channel: '#staging-alerts'
-        title: '[STAGING] 🔔 {{ .GroupLabels.alertname }}'
+        title: '{{ if eq .Status "resolved" }}[STAGING] ✅ RESOLVED: {{ .GroupLabels.alertname }}{{ else }}[STAGING] 🔔 {{ .GroupLabels.alertname }}{{ end }}'
         text: |
+          *Status:* {{ .Status | toUpper }}
           *Summary:* {{ .CommonAnnotations.summary }}
           *Description:* {{ .CommonAnnotations.description }}
           *Environment:* staging
+        color: '{{ if eq .Status "resolved" }}good{{ else }}warning{{ end }}'
         send_resolved: true
 
   # Critical 알림
   - name: 'slack-staging-critical'
     slack_configs:
       - channel: '#staging-critical'
-        title: '[STAGING] 🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        title: '{{ if eq .Status "resolved" }}[STAGING] ✅ RESOLVED: {{ .GroupLabels.alertname }}{{ else }}[STAGING] 🚨 CRITICAL: {{ .GroupLabels.alertname }}{{ end }}'
         text: |
+          *Status:* {{ .Status | toUpper }}
           *Summary:* {{ .CommonAnnotations.summary }}
           *Description:* {{ .CommonAnnotations.description }}
           *Service:* {{ .CommonLabels.service }}
           *Environment:* staging
-        color: 'danger'
+        color: '{{ if eq .Status "resolved" }}good{{ else }}danger{{ end }}'
         send_resolved: true
 
   # Warning 알림
   - name: 'slack-staging-warning'
     slack_configs:
       - channel: '#staging-warnings'
-        title: '[STAGING] ⚠️ Warning: {{ .GroupLabels.alertname }}'
+        title: '{{ if eq .Status "resolved" }}[STAGING] ✅ RESOLVED: {{ .GroupLabels.alertname }}{{ else }}[STAGING] ⚠️ Warning: {{ .GroupLabels.alertname }}{{ end }}'
         text: |
+          *Status:* {{ .Status | toUpper }}
           *Summary:* {{ .CommonAnnotations.summary }}
           *Description:* {{ .CommonAnnotations.description }}
           *Environment:* staging
-        color: 'warning'
+        color: '{{ if eq .Status "resolved" }}good{{ else }}warning{{ end }}'
         send_resolved: true
 
 inhibit_rules:
