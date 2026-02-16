@@ -1,0 +1,93 @@
+groups:
+  - name: infra_health
+    interval: 30s
+    rules:
+      # Alloy
+      - alert: AlloyDown
+        expr: absent(up{job="alloy"})
+        for: 2m
+        labels:
+          severity: critical
+          service: alloy
+        annotations:
+          summary: "Alloy가 다운되었습니다."
+          description: "Alloy에서 2분 이상 metric이 수신되지 않았습니다. 관련된 telemetry 수집이 중단된 상태입니다."
+      - alert: AlloyRestarted
+        expr: increase(process_start_time_seconds{job="alloy"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: alloy
+        annotations:
+          summary: "Alloy가 재시작되었습니다."
+          description: "Alloy가 최근 재시작되었습니다. OOM 또는 크래시 루프 가능성이 있습니다."
+
+      # Loki
+      - alert: LokiDown
+        expr: absent(up{job="loki"})
+        for: 2m
+        labels:
+          severity: critical
+          service: loki
+        annotations:
+          summary: "Loki가 다운되었습니다."
+          description: "Loki에서 2분 이상 metric이 수신되지 않았습니다. log 수집이 중단된 상태입니다."
+
+      # Tempo
+      - alert: TempoDown
+        expr: absent(up{job="tempo"})
+        for: 2m
+        labels:
+          severity: critical
+          service: tempo
+        annotations:
+          summary: "Tempo가 다운되었습니다."
+          description: "Tempo에서 2분 이상 metric이 수신되지 않았습니다. trace 수집이 중단된 상태입니다."
+
+      # mimir
+      - alert: MimirDown
+        expr: absent(up{job="mimir"})
+        for: 2m
+        labels:
+          severity: critical
+          service: mimir
+        annotations:
+          summary: "Mimir가 다운되었습니다"
+          description: "Mimir에서 2분 이상 metric이 수신되지 않습니다. metric 저장 및 알림 평가가 중단된 상태입니다."
+
+  - name: pipeline_health
+    interval: 30s
+    rules:
+      - alert: ExporterQueueFillingUp
+        expr: sum(otelcol_exporter_queue_size) / sum(otelcol_exporter_queue_capacity) > 0.7
+        for: 5m
+        labels:
+          severity: warning
+          service: alloy
+        annotations:
+          summary: "Exporter 큐가 70% 이상 찼습니다"
+          description: "Exporter 큐 사용률이 {{ $value | humanize }}%입니다. 백엔드가 느리거나 도달 불가능할 수 있습니다."
+      - alert: ExporterSendFailures
+        expr: |
+          increase(otelcol_exporter_send_failed_spans[5m]) > 0
+          or increase(otelcol_exporter_send_failed_metric_points[5m]) > 0
+          or increase(otelcol_exporter_send_failed_log_records[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: alloy
+        annotations:
+          summary: "Exporter 데이터 전송이 실패하고 있습니다"
+          description: "Exporter가 데이터 전송에 실패하고 있습니다. 백엔드 장애 가능성이 있습니다."
+      - alert: MemoryLimiterDropping
+        expr: |
+          increase(otelcol_processor_refused_spans[5m]) > 0
+          or increase(otelcol_processor_refused_metric_points[5m]) > 0
+          or increase(otelcol_processor_refused_log_records[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: alloy
+        annotations:
+          summary: "Memory limiter가 데이터를 드롭하고 있습니다"
+          description: "Alloy memory limiter가 데이터를 거부하고 있습니다. 거부된 데이터는 영구적으로 손실됩니다."
