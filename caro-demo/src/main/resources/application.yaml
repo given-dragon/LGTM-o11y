@@ -32,6 +32,13 @@ management:
         step: 15s
         headers:
           tenant_id: ${TENANT_ID:caro-backend-staging}
+        histogram-flavor: base2-exponential-bucket-histogram
+        max-scale: 20
+        max-bucket-count: 160
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
   opentelemetry:
     logging:
       export:
