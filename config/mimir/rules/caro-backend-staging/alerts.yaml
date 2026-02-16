@@ -2,80 +2,74 @@
 # 공식 문서: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
 
 groups:
-  # 그룹 1: 기본 테스트 알림
-  - name: test_alerts
-    interval: 30s  # 30초마다 규칙 평가
-    rules:
-      # 규칙 1: 항상 발생하는 테스트 알림
-      - alert: TestAlertAlwaysFiring
-        expr: vector(1)
-        for: 1m          # 1분 동안 조건이 유지되면 알림 발생
-        labels:
-          severity: warning
-          service: test-service
-          cluster: local
-        annotations:
-          summary: "테스트 알림: Alertmanager 연동 확인"
-          description: "이 알림은 Alertmanager 설정이 올바른지 확인하기 위한 테스트 알림입니다. Slack에서 이 메시지를 받으면 설정이 정상적으로 작동하는 것입니다."
-
-  # 그룹 2: Caro Demo 모니터링 알림
   - name: caro_demo_alerts
     interval: 30s
     rules:
-      # 규칙 2: Caro Demo가 다운되었을 때
-      # OTLP push 방식이라 up 메트릭이 없으므로 absent() 사용
       - alert: CaroDemoDown
-        expr: absent(application_ready_time_milliseconds{job="caro-demo-app"})
-        for: 3m
+        expr: absent_over_time(application_ready_time_milliseconds{job="caro-demo-app"}[3m])
+        for: 1m
         labels:
           severity: critical
           service: caro-demo-app
           cluster: local
         annotations:
           summary: "Caro Demo가 다운되었습니다"
-          description: "Caro Demo에서 2분 이상 HTTP 메트릭이 수신되지 않습니다. 즉시 확인이 필요합니다."
+          description: "Caro Demo의 application_ready_time 메트릭이 3분 이상 수신되지 않습니다. 애플리케이션이 중단되었을 수 있으므로 즉시 확인이 필요합니다."
 
-      # 규칙 3: HTTP 요청 실패율이 높을 때
-      - alert: HighHTTPErrorRate
+      - alert: HighLatencyBurnRate
         expr: |
           (
-            sum(rate(http_server_requests_milliseconds_count{job="caro-demo-app",status=~"5.."}[5m]))
-            /
-            sum(rate(http_server_requests_milliseconds_count{job="caro-demo-app"}[5m]))
-          ) * 100 > 5
-        for: 5m
+            (1 - histogram_fraction(0, 500, sum(rate(http_server_requests_milliseconds{job="caro-demo-app"}[1h])))) > 14.4 * 0.01
+          )
+          and
+          (
+            (1 - histogram_fraction(0, 500, sum(rate(http_server_requests_milliseconds{job="caro-demo-app"}[5m])))) > 14.4 * 0.01
+          )
+        for: 2m
         labels:
-          severity: warning
+          severity: critical
           service: caro-demo-app
           cluster: local
         annotations:
-          summary: "HTTP 5xx 에러율이 높습니다"
-          description: "최근 5분간 HTTP 5xx 에러율이 {{ $value | humanize }}%입니다. 정상 범위는 5% 미만입니다."
+          summary: "레이턴시 SLO 에러 버짓이 빠르게 소진되고 있습니다"
+          description: "SLO(99% < 500ms) 기준 burn rate가 14.4x를 초과했습니다. 이 속도면 2일 만에 한 달치 에러 버짓이 소진됩니다. 즉시 확인이 필요합니다."
 
-      - alert: HighP95Latency
+      - alert: HighP95LatencyByEndpoint
         expr: |
-          histogram_quantile(0.95,
-            sum(rate(http_server_requests_milliseconds_bucket{job="caro-demo-app"}[5m])) by (le)
-          ) > 1000
+          (
+            histogram_quantile(0.95, sum by (uri) (rate(http_server_requests_milliseconds{job="caro-demo-app"}[5m]))) > 1000
+          )
+          and
+          (
+            sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job="caro-demo-app"}[5m]))) > 0.01
+          )
+        for: 2m
+        labels:
+          severity: warning
+          service: caro-demo-app
+          cluster: local
+        annotations:
+          summary: "엔드포인트 {{ $labels.uri }}의 P95 레이턴시가 높습니다"
+          description: "{{ $labels.uri }}의 P95 레이턴시가 {{ $value | humanize }}ms입니다. 정상 범위는 1000ms 미만입니다."
+
+      - alert: HighHTTPErrorRateByEndpoint
+        expr: |
+          (
+            (
+              sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job="caro-demo-app",status=~"5.."}[5m])))
+              /
+              sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job="caro-demo-app"}[5m])))
+            ) * 100 > 5
+          )
+          and
+          (
+            sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job="caro-demo-app"}[5m]))) > 0.01
+          )
         for: 5m
         labels:
           severity: warning
           service: caro-demo-app
           cluster: local
         annotations:
-          summary: "P95 레이턴시가 높습니다"
-          description: "P95 레이턴시가 {{ $value | humanize }}ms입니다. 정상 범위는 1000ms 미만입니다."
-      - alert: HighTraceErrorRate
-        expr: |
-          sum(rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m]))
-          /
-          sum(rate(traces_spanmetrics_calls_total[5m]))
-          > 0.05
-        for: 5m
-        labels:
-          severity: warning
-          service: caro-demo-app
-          cluster: local
-        annotations:
-          summary: "트레이스 에러율이 높습니다"
-          description: "트레이싱된 작업의 {{ $value | humanizePercentage }}가 에러를 발생시키고 있습니다."
+          summary: "엔드포인트 {{ $labels.uri }}의 HTTP 5xx 에러율이 높습니다"
+          description: "{{ $labels.uri }}의 최근 5분간 HTTP 5xx 에러율이 {{ $value | humanize }}%입니다."
