@@ -25,8 +25,8 @@ groups:
       # 규칙 2: Caro Demo가 다운되었을 때
       # OTLP push 방식이라 up 메트릭이 없으므로 absent() 사용
       - alert: CaroDemoDown
-        expr: absent(http_server_requests_milliseconds_count{job="caro-demo-app"})
-        for: 2m
+        expr: absent(application_ready_time_milliseconds{job="caro-demo-app"})
+        for: 3m
         labels:
           severity: critical
           service: caro-demo-app
@@ -51,3 +51,31 @@ groups:
         annotations:
           summary: "HTTP 5xx 에러율이 높습니다"
           description: "최근 5분간 HTTP 5xx 에러율이 {{ $value | humanize }}%입니다. 정상 범위는 5% 미만입니다."
+
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_server_requests_milliseconds_bucket{job="caro-demo-app"}[5m])) by (le)
+          ) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: caro-demo-app
+          cluster: local
+        annotations:
+          summary: "P95 레이턴시가 높습니다"
+          description: "P95 레이턴시가 {{ $value | humanize }}ms입니다. 정상 범위는 1000ms 미만입니다."
+      - alert: HighTraceErrorRate
+        expr: |
+          sum(rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m]))
+          /
+          sum(rate(traces_spanmetrics_calls_total[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: caro-demo-app
+          cluster: local
+        annotations:
+          summary: "트레이스 에러율이 높습니다"
+          description: "트레이싱된 작업의 {{ $value | humanizePercentage }}가 에러를 발생시키고 있습니다."
