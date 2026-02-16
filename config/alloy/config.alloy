@@ -123,6 +123,30 @@ prometheus.scrape "alloy" {
   forward_to = [prometheus.remote_write.mimir.receiver]
 }
 
+prometheus.scrape "loki" {
+  targets = [{
+    __address__ = "loki:3100",
+    job         = "loki",
+  }]
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+prometheus.scrape "tempo" {
+  targets = [{
+    __address__ = "tempo:3200",
+    job         = "tempo",
+  }]
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+prometheus.scrape "mimir" {
+  targets = [{
+    __address__ = "mimir:9009",
+    job         = "mimir",
+  }]
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
 prometheus.remote_write "mimir" {
   endpoint {
     url = "http://mimir:9009/api/v1/push"
