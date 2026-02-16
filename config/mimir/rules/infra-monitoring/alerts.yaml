@@ -12,15 +12,15 @@ groups:
         annotations:
           summary: "Alloy가 다운되었습니다."
           description: "Alloy에서 2분 이상 metric이 수신되지 않았습니다. 관련된 telemetry 수집이 중단된 상태입니다."
-      - alert: AlloyRestarted
-        expr: increase(process_start_time_seconds{job="alloy"}[5m]) > 0
+      - alert: AlloyCrashLooping
+        expr: changes(process_start_time_seconds{job="alloy"}[5m]) > 2
         for: 0m
         labels:
-          severity: warning
+          severity: critical
           service: alloy
         annotations:
-          summary: "Alloy가 재시작되었습니다."
-          description: "Alloy가 최근 재시작되었습니다. OOM 또는 크래시 루프 가능성이 있습니다."
+          summary: "Alloy가 크래시 루프 상태입니다."
+          description: "Alloy가 5분 내 3회 이상 재시작되었습니다. OOM 또는 설정 오류로 인한 크래시 루프 가능성이 있습니다."
 
       # Loki
       - alert: LokiDown
