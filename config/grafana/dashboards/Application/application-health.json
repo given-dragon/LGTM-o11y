@@ -1,0 +1,1043 @@
+{
+  "uid": "application-health",
+  "title": "L0: Application Health",
+  "description": "Application runtime health overview - JVM Memory, GC, Threads, HikariCP Connection Pool, Log Events. Panels reference Grafana community dashboards 4701, 19004, 22108.",
+  "tags": ["spring-boot", "jvm", "health", "hikaricp"],
+  "timezone": "browser",
+  "editable": true,
+  "refresh": "15s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "App Restart",
+        "datasource": { "uid": "${datasource}" },
+        "enable": true,
+        "iconColor": "red",
+        "expr": "changes(process_start_time_milliseconds{job=\"$job\"}[$__rate_interval]) > 0",
+        "step": "1m",
+        "titleFormat": "Application Restarted",
+        "textFormat": "{{ $labels.instance }}"
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "L1: Service RED Overview",
+      "type": "link",
+      "icon": "search",
+      "url": "/d/service-red-overview?${datasource:queryparam}&var-job=${job}",
+      "tooltip": "Drill down to service-level RED metrics"
+    },
+    {
+      "title": "L2: JVM & DB Deep Dive",
+      "type": "link",
+      "icon": "search",
+      "url": "/d/jvm-db-deep-dive?${datasource:queryparam}&var-job=${job}",
+      "tooltip": "Drill down to JVM memory pools, GC detail, and HikariCP diagnostics"
+    },
+    {
+      "title": "L3: Endpoint Detail",
+      "type": "link",
+      "icon": "search",
+      "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}",
+      "tooltip": "Drill down to endpoint-level detail"
+    },
+    {
+      "title": "L4: Debug / Trace",
+      "type": "link",
+      "icon": "search",
+      "url": "/d/debug-trace?var-metrics_ds=${datasource}&var-job=${job}&var-service=${job}",
+      "tooltip": "Go to trace search and logs"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Metrics",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "selected": true,
+          "text": "Mimir-Staging",
+          "value": "mimir-staging"
+        }
+      },
+      {
+        "name": "job",
+        "type": "query",
+        "datasource": { "uid": "${datasource}" },
+        "query": "label_values(http_server_requests_milliseconds, job)",
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": "caro-demo-app",
+          "value": "caro-demo-app"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Application Status",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Uptime",
+      "description": "Application process uptime (ref: 4701 Quick Facts)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "expr": "process_uptime_milliseconds{job=\"$job\"}",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Heap Usage",
+      "description": "Heap memory used as percentage of max (ref: 4701/19004 - threshold 70/90%)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{job=\"$job\",area=\"heap\"}) * 100 / clamp_min(sum(jvm_memory_max_bytes{job=\"$job\",area=\"heap\"}), 1)",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Process CPU",
+      "description": "Process CPU usage percentage (ref: 4701/20352 JVM Misc)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "targets": [
+        {
+          "expr": "process_cpu_usage{job=\"$job\"} * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "System CPU",
+      "description": "Host/system CPU usage - compare with Process CPU to identify noisy neighbors (ref: 4701/20352)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "targets": [
+        {
+          "expr": "system_cpu_usage{job=\"$job\"} * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Live Threads",
+      "description": "Current number of live threads (ref: 4701 JVM Misc)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "targets": [
+        {
+          "expr": "jvm_threads_live{job=\"$job\"}",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "FD Usage",
+      "description": "Open file descriptors as percentage of max - FD exhaustion causes cliff failures (ref: 4701/20352)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "targets": [
+        {
+          "expr": "(process_files_open{job=\"$job\"} / clamp_min(process_files_max{job=\"$job\"}, 1)) * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          },
+          "noValue": "N/A"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "row",
+      "title": "RED Summary",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Request Rate",
+      "description": "Current requests per second (same as L1)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "expr": "sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Error Rate",
+      "description": "HTTP 5xx error percentage (same as L1)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 6 },
+      "targets": [
+        {
+          "expr": "(\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",status=~\"5..\"}[$__rate_interval]))) or vector(0))\n  /\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0)\n) * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "P95 Latency",
+      "description": "95th percentile response time (same as L1)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 6 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "SLO Compliance",
+      "description": "Requests under 500ms (SLO target: 99%) - same as L1",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 6 },
+      "targets": [
+        {
+          "expr": "(histogram_fraction(0, 500, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) * 100) or vector(100)",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "row",
+      "title": "JVM Memory",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Heap Memory",
+      "description": "Heap memory used, committed, and max over time (ref: 4701 JVM Memory, 19004 Memory Pool)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 11 },
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{job=\"$job\",area=\"heap\"})",
+          "legendFormat": "Used"
+        },
+        {
+          "expr": "sum(jvm_memory_committed_bytes{job=\"$job\",area=\"heap\"})",
+          "legendFormat": "Committed"
+        },
+        {
+          "expr": "sum(jvm_memory_max_bytes{job=\"$job\",area=\"heap\"})",
+          "legendFormat": "Max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Used" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
+              { "id": "custom.fillOpacity", "value": 20 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Committed" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Max" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Non-Heap Memory",
+      "description": "Non-Heap memory (Metaspace, Code Cache, etc.) used and committed (ref: 4701 JVM Memory)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 11 },
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{job=\"$job\",area=\"nonheap\"})",
+          "legendFormat": "Used"
+        },
+        {
+          "expr": "sum(jvm_memory_committed_bytes{job=\"$job\",area=\"nonheap\"})",
+          "legendFormat": "Committed"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Used" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } },
+              { "id": "custom.fillOpacity", "value": 20 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Committed" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Garbage Collection",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Allocation Rate",
+      "description": "Memory allocation rate - leading indicator of GC pressure. Spikes precede GC pause degradation (ref: 4701 GC Allocated/Promoted, 19004 GC Memory)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_memory_allocated_bytes_total{job=\"$job\"}[$__rate_interval])",
+          "legendFormat": "Allocated"
+        },
+        {
+          "expr": "rate(jvm_gc_memory_promoted_bytes_total{job=\"$job\"}[$__rate_interval])",
+          "legendFormat": "Promoted"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Allocated" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Promoted" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Pause Duration",
+      "description": "Time spent in GC per second, by action. Values approaching 1000 mean 100% GC time (ref: 4701 GC Pause Durations, 19004 GC Stop the World)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum by (action) (rate(jvm_gc_pause_milliseconds_sum{job=\"$job\"}[$__rate_interval]))",
+          "legendFormat": "{{ action }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "stacking": { "mode": "normal" }
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Count",
+      "description": "GC events per second by action (ref: 4701 Collections, 19004 GC Count)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum by (action) (rate(jvm_gc_pause_milliseconds_count{job=\"$job\"}[$__rate_interval]))",
+          "legendFormat": "{{ action }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "pointSize": 5,
+            "stacking": { "mode": "normal" }
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Threads",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Thread States",
+      "description": "JVM thread count by state - BLOCKED/WAITING threads indicate lock contention or deadlocks (ref: 4701 JVM Misc, 20352 Threads)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "targets": [
+        {
+          "expr": "sum by (state) (jvm_threads_states{job=\"$job\"})",
+          "legendFormat": "{{ state }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "runnable" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "blocked" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "waiting" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "timed-waiting" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Tomcat Threads",
+      "description": "Tomcat thread pool utilization - busy vs max capacity (ref: 4701 I/O Utilisation)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "targets": [
+        {
+          "expr": "tomcat_threads_busy{job=\"$job\"}",
+          "legendFormat": "Busy"
+        },
+        {
+          "expr": "tomcat_threads_current{job=\"$job\"}",
+          "legendFormat": "Current"
+        },
+        {
+          "expr": "tomcat_threads_config_max{job=\"$job\"}",
+          "legendFormat": "Max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Busy" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } },
+              { "id": "custom.fillOpacity", "value": 20 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Current" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Max" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Connection Pool (HikariCP)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Pool Saturation",
+      "description": "Active connections as percentage of total pool (ref: 19004 HikariCP - threshold 70/90%)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 38 },
+      "targets": [
+        {
+          "expr": "(sum(hikaricp_connections_active{job=\"$job\"}) / clamp_min(sum(hikaricp_connections{job=\"$job\"}), 1)) * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          },
+          "noValue": "N/A"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Pending Threads",
+      "description": "Threads waiting for a connection - any value above 0 indicates pool pressure (ref: 19004 HikariCP)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 38 },
+      "targets": [
+        {
+          "expr": "sum(hikaricp_connections_pending{job=\"$job\"})",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "noValue": "N/A"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Timeout Count",
+      "description": "Connection acquisition timeouts - any increase means pool exhaustion (ref: 19004 Connection Timeout Count)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 38 },
+      "targets": [
+        {
+          "expr": "sum(increase(hikaricp_connections_timeout_total{job=\"$job\"}[$__rate_interval]))",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "noValue": "N/A"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Pool Size",
+      "description": "Total connections in the pool (active + idle) (ref: 19004 Connections Size)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 38 },
+      "targets": [
+        {
+          "expr": "sum(hikaricp_connections{job=\"$job\"})",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          },
+          "noValue": "N/A"
+        }
+      },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Connections Over Time",
+      "description": "Active, idle, and pending connections stacked (ref: 19004 HikariCP Connections)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+      "targets": [
+        {
+          "expr": "sum(hikaricp_connections_active{job=\"$job\"})",
+          "legendFormat": "Active"
+        },
+        {
+          "expr": "sum(hikaricp_connections_idle{job=\"$job\"})",
+          "legendFormat": "Idle"
+        },
+        {
+          "expr": "sum(hikaricp_connections_pending{job=\"$job\"})",
+          "legendFormat": "Pending"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 30,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Active" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Idle" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Pending" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Connection Acquire Time",
+      "description": "Average time to acquire a connection from pool - spikes indicate pool pressure (ref: 19004 Connection Acquire Time)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+      "targets": [
+        {
+          "expr": "rate(hikaricp_connections_acquire_milliseconds_sum{job=\"$job\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_acquire_milliseconds_count{job=\"$job\"}[$__rate_interval]) > 0)",
+          "legendFormat": "Acquire"
+        },
+        {
+          "expr": "rate(hikaricp_connections_usage_milliseconds_sum{job=\"$job\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_usage_milliseconds_count{job=\"$job\"}[$__rate_interval]) > 0)",
+          "legendFormat": "Usage"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Acquire" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Usage" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Log Events",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Log Events by Level",
+      "description": "Logback event rate by log level (ref: 4701 Log Events, 19004 Logback Statistics)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 51 },
+      "targets": [
+        {
+          "expr": "sum by (level) (rate(logback_events_total{job=\"$job\"}[$__rate_interval]))",
+          "legendFormat": "{{ level }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "error" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "warn" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "info" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "debug" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "trace" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

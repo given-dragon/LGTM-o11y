@@ -1,0 +1,566 @@
+{
+  "uid": "infra-health",
+  "title": "L0: Infrastructure Health",
+  "description": "Observability stack health monitoring - Alloy, Loki, Mimir, Tempo",
+  "tags": ["infrastructure", "health", "l0"],
+  "timezone": "browser",
+  "editable": true,
+  "refresh": "15s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "selected": true,
+          "text": "Mimir-Infra",
+          "value": "mimir-infra"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Service Health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Alloy",
+      "description": "Alloy 수집기 상태",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 3, "w": 6, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "expr": "up{job=\"alloy\"}",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } },
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } }
+          ],
+          "noValue": "DOWN",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Loki",
+      "description": "Loki backend 상태",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 3, "w": 6, "x": 6, "y": 1 },
+      "targets": [
+        {
+          "expr": "up{job=\"loki\"}",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } },
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } }
+          ],
+          "noValue": "DOWN",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Mimir",
+      "description": "Mimir backend 상태",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 3, "w": 6, "x": 12, "y": 1 },
+      "targets": [
+        {
+          "expr": "up{job=\"mimir\"}",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } },
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } }
+          ],
+          "noValue": "DOWN",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Tempo",
+      "description": "Tempo backend 상태",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 3, "w": 6, "x": 18, "y": 1 },
+      "targets": [
+        {
+          "expr": "up{job=\"tempo\"}",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } },
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } }
+          ],
+          "noValue": "DOWN",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Alloy Collector",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Restarts (5m)",
+      "description": "최근 5분간 Alloy가 재시작된 횟수. 2번을 초과하면 Alert가 발생합니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 5 },
+      "targets": [
+        {
+          "expr": "changes(process_start_time_seconds{job=\"alloy\"}[5m])",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "Exporter Queue Usage",
+      "description": "Exporter queue의 점유율입니다. 70%를 초과하면 Alert가 발생합니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 5 },
+      "targets": [
+        {
+          "expr": "(sum(otelcol_exporter_queue_size) / sum(otelcol_exporter_queue_capacity)) * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 70 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Alloy Uptime",
+      "description": "Alloy 가동 시간(최근 재시작 기준)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 5 },
+      "targets": [
+        {
+          "expr": "time() - process_start_time_seconds{job=\"alloy\"}",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 300 },
+              { "color": "green", "value": 3600 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Alloy Memory",
+      "description": "Alloy 프로세스가 실제 점유 중인 메모리",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 5 },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes{job=\"alloy\"}",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 268435456 },
+              { "color": "red", "value": 536870912 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Pipeline Health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Exporter Queue Usage by Backend",
+      "description": "Exporter별 큐 사용량. 70% 초과 시 Alert 발생합니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
+      "targets": [
+        {
+          "expr": "(otelcol_exporter_queue_size / otelcol_exporter_queue_capacity) * 100",
+          "legendFormat": "{{ exporter }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 70 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Export Send Failures",
+      "description": "데이터 유형별 data export 실패율",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
+      "targets": [
+        {
+          "expr": "rate(otelcol_exporter_send_failed_spans[$__rate_interval])",
+          "legendFormat": "Traces ({{ exporter }})"
+        },
+        {
+          "expr": "rate(otelcol_exporter_send_failed_metric_points[$__rate_interval])",
+          "legendFormat": "Metrics ({{ exporter }})"
+        },
+        {
+          "expr": "rate(otelcol_exporter_send_failed_log_records[$__rate_interval])",
+          "legendFormat": "Logs ({{ exporter }})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Limiter Drops",
+      "description": "memory limiter에 의한 데이터 드롭률. 드롭된 데이터는 영구적으로 손실되어 복구 불가능합니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
+      "targets": [
+        {
+          "expr": "rate(otelcol_processor_refused_spans[$__rate_interval])",
+          "legendFormat": "Traces"
+        },
+        {
+          "expr": "rate(otelcol_processor_refused_metric_points[$__rate_interval])",
+          "legendFormat": "Metrics"
+        },
+        {
+          "expr": "rate(otelcol_processor_refused_log_records[$__rate_interval])",
+          "legendFormat": "Logs"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Resources",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Usage by Service",
+      "description": "서비스별 실제 메모리 점유율.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes{job=\"alloy\"}",
+          "legendFormat": "Alloy"
+        },
+        {
+          "expr": "process_resident_memory_bytes{job=\"loki\"}",
+          "legendFormat": "Loki"
+        },
+        {
+          "expr": "process_resident_memory_bytes{job=\"mimir\"}",
+          "legendFormat": "Mimir"
+        },
+        {
+          "expr": "process_resident_memory_bytes{job=\"tempo\"}",
+          "legendFormat": "Tempo"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Pause Duration by Service",
+      "description": "서비스별 최대 GC 정지시간. 이 수치가 높으면 Latency에 직접적인 영향을 미칩니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "targets": [
+        {
+          "expr": "go_gc_duration_seconds{job=\"alloy\",quantile=\"1.0\"}",
+          "legendFormat": "Alloy (max)"
+        },
+        {
+          "expr": "go_gc_duration_seconds{job=\"loki\",quantile=\"1.0\"}",
+          "legendFormat": "Loki (max)"
+        },
+        {
+          "expr": "go_gc_duration_seconds{job=\"mimir\",quantile=\"1.0\"}",
+          "legendFormat": "Mimir (max)"
+        },
+        {
+          "expr": "go_gc_duration_seconds{job=\"tempo\",quantile=\"1.0\"}",
+          "legendFormat": "Tempo (max)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Goroutines",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Goroutines by Service",
+      "datasource": { "uid": "${datasource}" },
+      "description": "서비스별 활성 goroutine 수. 갑작스러운 수치 상승은 리소스 누수를 의미할 수 있습니다.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "targets": [
+        {
+          "expr": "go_goroutines{job=\"alloy\"}",
+          "legendFormat": "Alloy"
+        },
+        {
+          "expr": "go_goroutines{job=\"loki\"}",
+          "legendFormat": "Loki"
+        },
+        {
+          "expr": "go_goroutines{job=\"mimir\"}",
+          "legendFormat": "Mimir"
+        },
+        {
+          "expr": "go_goroutines{job=\"tempo\"}",
+          "legendFormat": "Tempo"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

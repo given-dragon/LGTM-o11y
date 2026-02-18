@@ -1,0 +1,561 @@
+{
+  "uid": "debug-trace",
+  "title": "L4: Debug / Trace",
+  "description": "Trace search, span metrics, and application logs for debugging individual requests",
+  "tags": ["spring-boot", "trace", "tempo", "debug"],
+  "timezone": "browser",
+  "editable": true,
+  "refresh": "15s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "links": [
+    {
+      "title": "L0: Application Health",
+      "type": "link",
+      "icon": "arrow-left",
+      "url": "/d/application-health?var-datasource=${metrics_ds}&var-job=${job}",
+      "tooltip": "Back to Application Health overview"
+    },
+    {
+      "title": "L1: Service RED Overview",
+      "type": "link",
+      "icon": "arrow-left",
+      "url": "/d/service-red-overview?var-datasource=${metrics_ds}&var-job=${job}",
+      "tooltip": "Back to Service Overview"
+    },
+    {
+      "title": "L2: JVM & DB Deep Dive",
+      "type": "link",
+      "icon": "search",
+      "url": "/d/jvm-db-deep-dive?var-datasource=${metrics_ds}&var-job=${job}",
+      "tooltip": "Drill down to JVM/DB diagnostics"
+    },
+    {
+      "title": "L3: Endpoint Detail",
+      "type": "link",
+      "icon": "arrow-left",
+      "url": "/d/endpoint-detail?var-datasource=${metrics_ds}&var-job=${job}",
+      "tooltip": "Back to Endpoint Detail"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "tempo_ds",
+        "label": "Tempo",
+        "type": "datasource",
+        "query": "tempo",
+        "current": {
+          "selected": true,
+          "text": "Tempo-Staging",
+          "value": "tempo-staging"
+        }
+      },
+      {
+        "name": "metrics_ds",
+        "label": "Metrics",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "selected": true,
+          "text": "Mimir-Staging",
+          "value": "mimir-staging"
+        }
+      },
+      {
+        "name": "logs_ds",
+        "label": "Logs",
+        "type": "datasource",
+        "query": "loki",
+        "current": {
+          "selected": true,
+          "text": "Loki-Staging",
+          "value": "loki-staging"
+        }
+      },
+      {
+        "name": "job",
+        "type": "query",
+        "datasource": { "uid": "${metrics_ds}" },
+        "query": "label_values(http_server_requests_milliseconds, job)",
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": "caro-demo-app",
+          "value": "caro-demo-app"
+        }
+      },
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": { "uid": "${metrics_ds}" },
+        "query": "label_values(traces_spanmetrics_calls_total, service)",
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": "caro-demo-app",
+          "value": "caro-demo-app"
+        }
+      },
+      {
+        "name": "log_keyword",
+        "label": "Log Filter",
+        "type": "textbox",
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "traceId",
+        "label": "Trace ID",
+        "type": "textbox",
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Span Metrics Overview",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Trace Rate",
+      "description": "Span calls per second across all services",
+      "datasource": { "uid": "${metrics_ds}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum(rate(traces_spanmetrics_calls_total{service=\"$service\"}[$__rate_interval]))",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Error Trace Rate",
+      "description": "Error span calls per second",
+      "datasource": { "uid": "${metrics_ds}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum(rate(traces_spanmetrics_calls_total{service=\"$service\",status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval]))",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "P95 Span Duration",
+      "description": "95th percentile span duration",
+      "datasource": { "uid": "${metrics_ds}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{service=\"$service\"}[$__rate_interval])) by (le))",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Active Services",
+      "description": "Number of services emitting traces",
+      "datasource": { "uid": "${metrics_ds}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "targets": [
+        {
+          "expr": "count(count by (service) (traces_spanmetrics_calls_total))",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Span Metrics Trend",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Span Rate by Service",
+      "description": "Span calls per second grouped by service",
+      "datasource": { "uid": "${metrics_ds}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(traces_spanmetrics_calls_total{service=\"$service\"}[$__rate_interval]))",
+          "legendFormat": "{{ service }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Span Error Rate Trend",
+      "description": "Error rate percentage by service",
+      "datasource": { "uid": "${metrics_ds}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "targets": [
+        {
+          "expr": "(\n  (sum by (service) (rate(traces_spanmetrics_calls_total{service=\"$service\",status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval]))\n    or sum by (service) (rate(traces_spanmetrics_calls_total{service=\"$service\"}[$__rate_interval])) * 0)\n  /\n  (sum by (service) (rate(traces_spanmetrics_calls_total{service=\"$service\"}[$__rate_interval])) > 0)\n) * 100",
+          "legendFormat": "{{ service }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Duration Analysis",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Span Duration Percentiles",
+      "description": "P50, P95, P99 span duration over time",
+      "datasource": { "uid": "${metrics_ds}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(traces_spanmetrics_latency_bucket{service=\"$service\"}[$__rate_interval])) by (le))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{service=\"$service\"}[$__rate_interval])) by (le))",
+          "legendFormat": "P95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(traces_spanmetrics_latency_bucket{service=\"$service\"}[$__rate_interval])) by (le))",
+          "legendFormat": "P99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "P50" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "P95" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "P99" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "P95 Duration by Operation",
+      "description": "95th percentile span duration by span name",
+      "datasource": { "uid": "${metrics_ds}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (span_name, le) (rate(traces_spanmetrics_latency_bucket{service=\"$service\"}[$__rate_interval])))",
+          "legendFormat": "{{ span_name }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Trace Search",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": false
+    },
+    {
+      "type": "table",
+      "title": "Trace Search Results",
+      "description": "Search traces by service - click Trace ID to view span waterfall below",
+      "datasource": { "uid": "${tempo_ds}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "datasource": { "uid": "${tempo_ds}" },
+          "queryType": "traceql",
+          "query": "{ resource.service.name = \"$service\" }",
+          "tableType": "traces",
+          "limit": 20,
+          "spss": 3,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "traceID" },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View Trace",
+                    "url": "/d/debug-trace?var-traceId=${__data.fields[\"traceID\"]}&var-tempo_ds=${tempo_ds}&var-metrics_ds=${metrics_ds}&var-logs_ds=${logs_ds}&var-job=${job}&var-service=${service}",
+                    "targetBlank": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Start time", "desc": true }]
+      }
+    },
+    {
+      "type": "traces",
+      "title": "Trace Detail",
+      "description": "Click a Trace ID above to view the span waterfall diagram",
+      "datasource": { "uid": "${tempo_ds}" },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "datasource": { "uid": "${tempo_ds}" },
+          "queryType": "traceql",
+          "query": "${traceId}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Logs",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Log Level Rate",
+      "description": "Log entries per second grouped by level",
+      "datasource": { "uid": "${logs_ds}" },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 47 },
+      "targets": [
+        {
+          "datasource": { "uid": "${logs_ds}" },
+          "expr": "sum by (detected_level) (rate({service_name=\"$job\"} |= \"$log_keyword\" [$__auto]))",
+          "legendFormat": "{{ detected_level }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "error" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "warn" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "info" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "debug" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Application Logs",
+      "description": "Application logs from Loki - use Log Filter variable to search",
+      "datasource": { "uid": "${logs_ds}" },
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 47 },
+      "targets": [
+        {
+          "datasource": { "uid": "${logs_ds}" },
+          "expr": "{service_name=\"$job\"} |= \"$log_keyword\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

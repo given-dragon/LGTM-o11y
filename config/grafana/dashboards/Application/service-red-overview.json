@@ -1,0 +1,664 @@
+{
+  "uid": "service-red-overview",
+  "title": "L1: Service RED Overview",
+  "description": "Service-level RED (Rate, Errors, Duration) dashboard for Spring Boot applications using Native Histograms",
+  "tags": ["spring-boot", "red", "native-histogram"],
+  "timezone": "browser",
+  "editable": true,
+  "refresh": "15s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "App Restart",
+        "datasource": { "uid": "${datasource}" },
+        "enable": true,
+        "iconColor": "red",
+        "expr": "changes(process_start_time_milliseconds{job=\"$job\"}[$__rate_interval]) > 0",
+        "step": "1m",
+        "titleFormat": "Application Restarted",
+        "textFormat": "{{ $labels.instance }}"
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "L0: Application Health",
+      "type": "link",
+      "icon": "arrow-left",
+      "url": "/d/application-health?${datasource:queryparam}&var-job=${job}",
+      "tooltip": "Back to Application Health overview"
+    },
+    {
+      "title": "L3: Endpoint Detail",
+      "type": "link",
+      "icon": "search",
+      "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}",
+      "tooltip": "Drill down to endpoint-level detail"
+    },
+    {
+      "title": "L4: Debug / Trace",
+      "type": "link",
+      "icon": "search",
+      "url": "/d/debug-trace?var-metrics_ds=${datasource}&var-job=${job}&var-service=${job}",
+      "tooltip": "Go to trace search and logs"
+    },
+    {
+      "title": "L2: JVM & DB Deep Dive",
+      "type": "link",
+      "icon": "search",
+      "url": "/d/jvm-db-deep-dive?${datasource:queryparam}&var-job=${job}",
+      "tooltip": "Drill down to JVM memory pools, GC detail, and HikariCP diagnostics"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Metrics",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "selected": true,
+          "text": "Mimir-Staging",
+          "value": "mimir-staging"
+        }
+      },
+      {
+        "name": "job",
+        "type": "query",
+        "datasource": { "uid": "${datasource}" },
+        "query": "label_values(http_server_requests_milliseconds, job)",
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": "caro-demo-app",
+          "value": "caro-demo-app"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Health Summary",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Request Rate",
+      "description": "Current requests per second",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Error Rate",
+      "description": "HTTP 5xx error percentage",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "targets": [
+        {
+          "expr": "(\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",status=~\"5..\"}[$__rate_interval]))) or vector(0))\n  /\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0)\n) * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "P95 Latency",
+      "description": "95th percentile response time",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "SLO Compliance",
+      "description": "Requests under 500ms (SLO target: 99%)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "targets": [
+        {
+          "expr": "(histogram_fraction(0, 500, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) * 100) or vector(100)",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Rate",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Rate by Endpoint",
+      "description": "Requests per second grouped by URI",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "expr": "sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": "{{ uri }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Rate by Status Code",
+      "description": "Requests per second grouped by HTTP status code",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "targets": [
+        {
+          "expr": "sum by (status) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": "{{ status }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "2.." },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "4.." },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "5.." },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Errors",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Error Rate by Endpoint",
+      "description": "HTTP 5xx error percentage per endpoint",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "targets": [
+        {
+          "expr": "(\n  (\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",status=~\"5..\"}[$__rate_interval])))\n    or\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) * 0\n  )\n  /\n  (sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0)\n) * 100",
+          "legendFormat": "{{ uri }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "5xx Error Count by Endpoint",
+      "description": "Absolute 5xx error count per second by endpoint",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "targets": [
+        {
+          "expr": "sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",status=~\"5..\"}[$__rate_interval])))",
+          "legendFormat": "{{ uri }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Duration",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency Percentiles (P50 / P95 / P99)",
+      "description": "Response time percentiles over time",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": "P95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": "P99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "P50" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "P95" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "P99" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "P95 Latency by Endpoint",
+      "description": "95th percentile response time per endpoint",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": "{{ uri }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "Average Latency by Endpoint",
+      "description": "Average response time per endpoint for quick comparison",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "histogram_avg(sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "legendFormat": "{{ uri }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 200 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "lcd",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Endpoint Detail",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "collapsed": false
+    },
+    {
+      "type": "table",
+      "title": "Endpoint Summary",
+      "description": "All endpoints with Rate, Error %, P50, P95, P99",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 39 },
+      "targets": [
+        {
+          "expr": "sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "table",
+          "instant": false,
+          "range": true
+        },
+        {
+          "expr": "(\n  (\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",status=~\"5..\"}[$__rate_interval])))\n    or\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) * 0\n  )\n  /\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))\n) * 100\nand\nsum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0",
+          "legendFormat": "",
+          "refId": "B",
+          "format": "table",
+          "instant": false,
+          "range": true
+        },
+        {
+          "expr": "(\n  histogram_quantile(0.50, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))\n  and\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0\n) >= 0",
+          "legendFormat": "",
+          "refId": "C",
+          "format": "table",
+          "instant": false,
+          "range": true
+        },
+        {
+          "expr": "(\n  histogram_quantile(0.95, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))\n  and\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0\n) >= 0",
+          "legendFormat": "",
+          "refId": "D",
+          "format": "table",
+          "instant": false,
+          "range": true
+        },
+        {
+          "expr": "(\n  histogram_quantile(0.99, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))\n  and\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0\n) >= 0",
+          "legendFormat": "",
+          "refId": "E",
+          "format": "table",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "pattern": "^(uri|Value).*"
+            }
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "uri": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "Value #A": {
+                "aggregations": ["mean"],
+                "operation": "aggregate"
+              },
+              "Value #B": {
+                "aggregations": ["mean"],
+                "operation": "aggregate"
+              },
+              "Value #C": {
+                "aggregations": ["mean"],
+                "operation": "aggregate"
+              },
+              "Value #D": {
+                "aggregations": ["mean"],
+                "operation": "aggregate"
+              },
+              "Value #E": {
+                "aggregations": ["mean"],
+                "operation": "aggregate"
+              }
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "renameByName": {
+              "uri": "Endpoint",
+              "Value #A (mean)": "Rate (req/s)",
+              "Value #B (mean)": "Error %",
+              "Value #C (mean)": "P50 (ms)",
+              "Value #D (mean)": "P95 (ms)",
+              "Value #E (mean)": "P99 (ms)"
+            },
+            "indexByName": {
+              "uri": 0,
+              "Value #A (mean)": 1,
+              "Value #B (mean)": 2,
+              "Value #C (mean)": 3,
+              "Value #D (mean)": 4,
+              "Value #E (mean)": 5
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Endpoint" },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View Endpoint Detail",
+                    "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}&var-uri=${__data.fields.Endpoint}",
+                    "targetBlank": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Rate (req/s)" },
+            "properties": [
+              { "id": "unit", "value": "reqps" },
+              { "id": "decimals", "value": 2 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Error %" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "decimals", "value": 2 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 5 }] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "P\\d+ \\(ms\\)" },
+            "properties": [
+              { "id": "unit", "value": "ms" },
+              { "id": "decimals", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Rate (req/s)", "desc": true }]
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}
