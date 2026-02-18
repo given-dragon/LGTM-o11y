@@ -181,6 +181,7 @@ datasources:
     jsonData:
       httpMethod: POST
       timeout: 120
+      timeInterval: "60s"
       httpHeaderName1: "X-Scope-OrgID"
     secureJsonData:
       httpHeaderValue1: "infra-monitoring"
