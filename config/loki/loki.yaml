@@ -17,9 +17,17 @@ common:
   instance_addr: 127.0.0.1
   path_prefix: /loki
   storage:
-    filesystem:
-      chunks_directory: /loki/chunks
-      rules_directory: /loki/rules
+#    filesystem:
+#      chunks_directory: /loki/chunks
+#      rules_directory: /loki/rules
+    s3:
+      endpoint: http://${GARAGE_ENDPOINT}
+      region: garage
+      bucketnames: loki-chunks
+      access_key_id: ${GARAGE_LOKI_ACCESS_KEY_ID}
+      secret_access_key: ${GARAGE_LOKI_SECRET_ACCESS_KEY}
+      s3forcepathstyle: true
+      insecure: true
   replication_factor: 1
   ring:
     instance_addr: 127.0.0.1
@@ -30,7 +38,7 @@ schema_config:
   configs:
     - from: 2025-01-01
       store: tsdb
-      object_store: filesystem
+      object_store: s3  # filesystem
       schema: v13
       index:
         prefix: index_
@@ -40,8 +48,16 @@ storage_config:
   tsdb_shipper:
     active_index_directory: /loki/tsdb-index
     cache_location: /loki/tsdb-cache
-  filesystem:
-    directory: /loki/chunks
+#  filesystem:
+#    directory: /loki/chunks
+  aws:
+    endpoint: http://${GARAGE_ENDPOINT}
+    region: garage
+    bucketnames: loki-chunks
+    access_key_id: ${GARAGE_LOKI_ACCESS_KEY_ID}
+    secret_access_key: ${GARAGE_LOKI_SECRET_ACCESS_KEY}
+    s3forcepathstyle: true
+    insecure: true
 
 compactor:
   working_directory: /loki/compactor
@@ -49,7 +65,7 @@ compactor:
   retention_enabled: true
   retention_delete_delay: 2h
   retention_delete_worker_count: 50
-  delete_request_store: filesystem
+  delete_request_store: s3  # filesystem
 
 limits_config:
   # Retention 설정

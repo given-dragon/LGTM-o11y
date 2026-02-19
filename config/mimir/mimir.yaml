@@ -20,14 +20,22 @@ server:
 
 common:
   storage:
-    backend: filesystem
-    filesystem:
-      dir: /data/tsdb
+    backend: s3  # filesystem
+#    filesystem:
+#      dir: /data/tsdb
+    s3:
+      endpoint: ${GARAGE_ENDPOINT}
+      region: garage
+      access_key_id: ${GARAGE_MIMIR_ACCESS_KEY_ID}
+      secret_access_key: ${GARAGE_MIMIR_SECRET_ACCESS_KEY}
+      insecure: true
 
 blocks_storage:
-  backend: filesystem
-  filesystem:
-    dir: /data/blocks
+  backend: s3  # filesystem
+#  filesystem:
+#    dir: /data/blocks
+  s3:
+    bucket_name: mimir-blocks
   tsdb:
     dir: /data/tsdb
     retention_period: 13h
@@ -92,7 +100,7 @@ ruler:
   poll_interval: 1m
 
 ruler_storage:
-  backend: local
+  backend: local  # rule 저장에는 filesyste이 편해서 유지
   local:
     directory: /etc/mimir/rules  # Tenant별 디렉터리: /etc/mimir/rules/${TENANT_ID}/
 
@@ -109,7 +117,7 @@ alertmanager:
     replication_factor: 2  # RF=1 버그 우회를 위해 1초과로 설정 (github issue: grafana/mimir#2910)
 
 alertmanager_storage:
-  backend: local
+  backend: local  # alert 저장에는 filesyste이 편해서 유지
   local:
     path: /etc/mimir/alertmanager-tenants
 

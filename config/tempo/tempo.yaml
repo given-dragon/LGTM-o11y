@@ -29,11 +29,19 @@ ingester:
 
 storage:
   trace:
-    backend: local
+    backend: s3  # local
     wal:
       path: /var/tempo/wal
-    local:
-      path: /var/tempo/blocks
+#    local:
+#      path: /var/tempo/blocks
+    s3:
+      endpoint: ${GARAGE_ENDPOINT}
+      region: garage
+      bucket: tempo-traces
+      access_key: ${GARAGE_TEMPO_ACCESS_KEY}
+      secret_key: ${GARAGE_TEMPO_SECRET_KEY}
+      insecure: true
+      forcepathstyle: true
     pool:
       max_workers: 100
       queue_depth: 10000

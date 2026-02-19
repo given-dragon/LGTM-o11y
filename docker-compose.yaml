@@ -44,7 +44,11 @@ services:
     restart: unless-stopped
     ports:
       - "${LOKI_PORT:-3100}:3100"
-    command: -config.file=/etc/loki/loki.yaml
+    command: -config.file=/etc/loki/loki.yaml -config.expand-env=true
+    environment:
+      - GARAGE_ENDPOINT
+      - GARAGE_LOKI_ACCESS_KEY_ID
+      - GARAGE_LOKI_SECRET_ACCESS_KEY
     volumes:
       - ./config/loki/loki.yaml:/etc/loki/loki.yaml
       - ./config/loki/runtime-config.yaml:/etc/loki/runtime-config.yaml
@@ -65,7 +69,11 @@ services:
     restart: unless-stopped
     ports:
       - "${TEMPO_PORT:-3200}:3200" # Tempo HTTP API
-    command: -config.file=/etc/tempo/tempo.yaml
+    command: -config.file=/etc/tempo/tempo.yaml -config.expand-env=true
+    environment:
+      - GARAGE_ENDPOINT
+      - GARAGE_TEMPO_ACCESS_KEY
+      - GARAGE_TEMPO_SECRET_KEY
     volumes:
       - ./config/tempo/tempo.yaml:/etc/tempo/tempo.yaml
       - ./config/tempo/runtime-config.yaml:/etc/tempo/runtime-config.yaml
@@ -80,7 +88,11 @@ services:
     restart: unless-stopped
     ports:
       - "${MIMIR_PORT:-9009}:9009"
-    command: -config.file=/etc/mimir/mimir.yaml
+    command: -config.file=/etc/mimir/mimir.yaml -config.expand-env=true
+    environment:
+      - GARAGE_ENDPOINT
+      - GARAGE_MIMIR_ACCESS_KEY_ID
+      - GARAGE_MIMIR_SECRET_ACCESS_KEY
     volumes:
       - ./config/mimir/mimir.yaml:/etc/mimir/mimir.yaml
       - ./config/mimir/runtime-config.yaml:/etc/mimir/runtime-config.yaml
@@ -100,6 +112,8 @@ services:
       - "4317:4317" # OTLP gRPC
       - "4318:4318" # OTLP HTTP
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    environment:
+      - GARAGE_METRIC_BEARER_TOKEN
     volumes:
       - ./data/alloy:/var/lib/alloy
       - ./config/alloy/config.alloy:/etc/alloy/config.alloy
