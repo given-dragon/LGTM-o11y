@@ -17,7 +17,7 @@
         "datasource": { "uid": "${datasource}" },
         "enable": true,
         "iconColor": "red",
-        "expr": "changes(process_start_time_milliseconds{job=\"$job\"}[$__rate_interval]) > 0",
+        "expr": "changes(process_start_time_milliseconds{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]) > 0",
         "step": "1m",
         "titleFormat": "Application Restarted",
         "textFormat": "{{ $labels.instance }}"
@@ -29,21 +29,21 @@
       "title": "L1: Service RED Overview",
       "type": "link",
       "icon": "search",
-      "url": "/d/service-red-overview?${datasource:queryparam}&var-job=${job}",
+      "url": "/d/service-red-overview?${datasource:queryparam}&var-job=${job}&var-instance=${instance}",
       "tooltip": "Drill down to service-level RED metrics"
     },
     {
       "title": "L2: JVM & DB Deep Dive",
       "type": "link",
       "icon": "search",
-      "url": "/d/jvm-db-deep-dive?${datasource:queryparam}&var-job=${job}",
+      "url": "/d/jvm-db-deep-dive?${datasource:queryparam}&var-job=${job}&var-instance=${instance}",
       "tooltip": "Drill down to JVM memory pools, GC detail, and HikariCP diagnostics"
     },
     {
       "title": "L3: Endpoint Detail",
       "type": "link",
       "icon": "search",
-      "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}",
+      "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}&var-instance=${instance}",
       "tooltip": "Drill down to endpoint-level detail"
     },
     {
@@ -79,6 +79,23 @@
           "text": "caro-demo-app",
           "value": "caro-demo-app"
         }
+      },
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "query",
+        "datasource": { "uid": "${datasource}" },
+        "query": "label_values(http_server_requests_milliseconds{job=\"$job\"}, instance)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
       }
     ]
   },
@@ -97,7 +114,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
       "targets": [
         {
-          "expr": "process_uptime_milliseconds{job=\"$job\"}",
+          "expr": "process_uptime_milliseconds{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": ""
         }
       ],
@@ -127,7 +144,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
       "targets": [
         {
-          "expr": "sum(jvm_memory_used_bytes{job=\"$job\",area=\"heap\"}) * 100 / clamp_min(sum(jvm_memory_max_bytes{job=\"$job\",area=\"heap\"}), 1)",
+          "expr": "sum(jvm_memory_used_bytes{job=\"$job\",instance=~\"$instance\",area=\"heap\"}) * 100 / clamp_min(sum(jvm_memory_max_bytes{job=\"$job\",instance=~\"$instance\",area=\"heap\"}), 1)",
           "legendFormat": ""
         }
       ],
@@ -160,7 +177,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
       "targets": [
         {
-          "expr": "process_cpu_usage{job=\"$job\"} * 100",
+          "expr": "process_cpu_usage{job=\"$job\",instance=~\"$instance\"} * 100",
           "legendFormat": ""
         }
       ],
@@ -193,7 +210,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
       "targets": [
         {
-          "expr": "system_cpu_usage{job=\"$job\"} * 100",
+          "expr": "system_cpu_usage{job=\"$job\",instance=~\"$instance\"} * 100",
           "legendFormat": ""
         }
       ],
@@ -226,7 +243,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
       "targets": [
         {
-          "expr": "jvm_threads_live{job=\"$job\"}",
+          "expr": "jvm_threads_live{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": ""
         }
       ],
@@ -256,7 +273,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
       "targets": [
         {
-          "expr": "(process_files_open{job=\"$job\"} / clamp_min(process_files_max{job=\"$job\"}, 1)) * 100",
+          "expr": "(process_files_open{job=\"$job\",instance=~\"$instance\"} / clamp_min(process_files_max{job=\"$job\",instance=~\"$instance\"}, 1)) * 100",
           "legendFormat": ""
         }
       ],
@@ -293,10 +310,10 @@
       "title": "Request Rate",
       "description": "Current requests per second (same as L1)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 6 },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 6 },
       "targets": [
         {
-          "expr": "sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "expr": "sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": ""
         }
       ],
@@ -321,13 +338,13 @@
     },
     {
       "type": "stat",
-      "title": "Error Rate",
-      "description": "HTTP 5xx error percentage (same as L1)",
+      "title": "5xx Error Rate",
+      "description": "HTTP 5xx server error percentage",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 6 },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 6 },
       "targets": [
         {
-          "expr": "(\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",status=~\"5..\"}[$__rate_interval]))) or vector(0))\n  /\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0)\n) * 100",
+          "expr": "(\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",status=~\"5..\"}[$__rate_interval]))) or vector(0))\n  /\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]))) > 0)\n) * 100",
           "legendFormat": ""
         }
       ],
@@ -355,13 +372,47 @@
     },
     {
       "type": "stat",
-      "title": "P95 Latency",
-      "description": "95th percentile response time (same as L1)",
+      "title": "4xx Client Error Rate",
+      "description": "HTTP 4xx client error percentage (auth, validation, not found)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 6 },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 6 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "expr": "(\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",status=~\"4..\"}[$__rate_interval]))) or vector(0))\n  /\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]))) > 0)\n) * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 15 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "P95 Latency",
+      "description": "95th percentile response time",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 6 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": ""
         }
       ],
@@ -388,12 +439,12 @@
     {
       "type": "stat",
       "title": "SLO Compliance",
-      "description": "Requests under 500ms (SLO target: 99%) - same as L1",
+      "description": "Requests under 500ms (SLO target: 99%)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 6 },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 6 },
       "targets": [
         {
-          "expr": "(histogram_fraction(0, 500, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) * 100) or vector(100)",
+          "expr": "(histogram_fraction(0, 500, sum(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]))) * 100) or vector(100)",
           "legendFormat": ""
         }
       ],
@@ -419,6 +470,40 @@
       }
     },
     {
+      "type": "stat",
+      "title": "SLO Burn Rate (1h)",
+      "description": "1h burn rate relative to SLO error budget (99% under 500ms). Rate > 1 means budget depleting faster than intended. Rate > 5 is a fast-burn signal.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 6 },
+      "targets": [
+        {
+          "expr": "(1 - histogram_fraction(0, 500, sum(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\"}[1h])))) / (1 - 0.99)",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
       "type": "row",
       "title": "JVM Memory",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
@@ -432,15 +517,15 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 11 },
       "targets": [
         {
-          "expr": "sum(jvm_memory_used_bytes{job=\"$job\",area=\"heap\"})",
+          "expr": "sum(jvm_memory_used_bytes{job=\"$job\",instance=~\"$instance\",area=\"heap\"})",
           "legendFormat": "Used"
         },
         {
-          "expr": "sum(jvm_memory_committed_bytes{job=\"$job\",area=\"heap\"})",
+          "expr": "sum(jvm_memory_committed_bytes{job=\"$job\",instance=~\"$instance\",area=\"heap\"})",
           "legendFormat": "Committed"
         },
         {
-          "expr": "sum(jvm_memory_max_bytes{job=\"$job\",area=\"heap\"})",
+          "expr": "sum(jvm_memory_max_bytes{job=\"$job\",instance=~\"$instance\",area=\"heap\"})",
           "legendFormat": "Max"
         }
       ],
@@ -492,11 +577,11 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 11 },
       "targets": [
         {
-          "expr": "sum(jvm_memory_used_bytes{job=\"$job\",area=\"nonheap\"})",
+          "expr": "sum(jvm_memory_used_bytes{job=\"$job\",instance=~\"$instance\",area=\"nonheap\"})",
           "legendFormat": "Used"
         },
         {
-          "expr": "sum(jvm_memory_committed_bytes{job=\"$job\",area=\"nonheap\"})",
+          "expr": "sum(jvm_memory_committed_bytes{job=\"$job\",instance=~\"$instance\",area=\"nonheap\"})",
           "legendFormat": "Committed"
         }
       ],
@@ -547,11 +632,11 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
       "targets": [
         {
-          "expr": "rate(jvm_gc_memory_allocated_bytes_total{job=\"$job\"}[$__rate_interval])",
+          "expr": "rate(jvm_gc_memory_allocated_bytes_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])",
           "legendFormat": "Allocated"
         },
         {
-          "expr": "rate(jvm_gc_memory_promoted_bytes_total{job=\"$job\"}[$__rate_interval])",
+          "expr": "rate(jvm_gc_memory_promoted_bytes_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])",
           "legendFormat": "Promoted"
         }
       ],
@@ -590,7 +675,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
       "targets": [
         {
-          "expr": "sum by (action) (rate(jvm_gc_pause_milliseconds_sum{job=\"$job\"}[$__rate_interval]))",
+          "expr": "sum by (action) (rate(jvm_gc_pause_milliseconds_sum{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{ action }}"
         }
       ],
@@ -620,7 +705,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
       "targets": [
         {
-          "expr": "sum by (action) (rate(jvm_gc_pause_milliseconds_count{job=\"$job\"}[$__rate_interval]))",
+          "expr": "sum by (action) (rate(jvm_gc_pause_milliseconds_count{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{ action }}"
         }
       ],
@@ -654,7 +739,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
       "targets": [
         {
-          "expr": "sum by (state) (jvm_threads_states{job=\"$job\"})",
+          "expr": "sum by (state) (jvm_threads_states{job=\"$job\",instance=~\"$instance\"})",
           "legendFormat": "{{ state }}"
         }
       ],
@@ -699,19 +784,19 @@
       "title": "Tomcat Threads",
       "description": "Tomcat thread pool utilization - busy vs max capacity (ref: 4701 I/O Utilisation)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "gridPos": { "h": 6, "w": 9, "x": 12, "y": 29 },
       "targets": [
         {
-          "expr": "tomcat_threads_busy{job=\"$job\"}",
-          "legendFormat": "Busy"
+          "expr": "sum by(instance)(tomcat_threads_busy{job=\"$job\",instance=~\"$instance\"})",
+          "legendFormat": "Busy ({{ instance }})"
         },
         {
-          "expr": "tomcat_threads_current{job=\"$job\"}",
-          "legendFormat": "Current"
+          "expr": "sum by(instance)(tomcat_threads_current{job=\"$job\",instance=~\"$instance\"})",
+          "legendFormat": "Current ({{ instance }})"
         },
         {
-          "expr": "tomcat_threads_config_max{job=\"$job\"}",
-          "legendFormat": "Max"
+          "expr": "sum by(instance)(tomcat_threads_config_max{job=\"$job\",instance=~\"$instance\"})",
+          "legendFormat": "Max ({{ instance }})"
         }
       ],
       "fieldConfig": {
@@ -752,6 +837,39 @@
       }
     },
     {
+      "type": "gauge",
+      "title": "Tomcat Thread Saturation",
+      "description": "Tomcat thread pool saturation (busy/max). Above 80% risks request queuing; 100% = thread pool exhaustion.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 3, "x": 21, "y": 29 },
+      "targets": [
+        {
+          "expr": "max(\n  sum by(instance)(tomcat_threads_busy{job=\"$job\",instance=~\"$instance\"})\n  / clamp_min(sum by(instance)(tomcat_threads_config_max{job=\"$job\",instance=~\"$instance\"}), 1)\n) * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
       "type": "row",
       "title": "Connection Pool (HikariCP)",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
@@ -765,7 +883,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 38 },
       "targets": [
         {
-          "expr": "(sum(hikaricp_connections_active{job=\"$job\"}) / clamp_min(sum(hikaricp_connections{job=\"$job\"}), 1)) * 100",
+          "expr": "(sum(hikaricp_connections_active{job=\"$job\",instance=~\"$instance\"}) / clamp_min(sum(hikaricp_connections{job=\"$job\",instance=~\"$instance\"}), 1)) * 100",
           "legendFormat": ""
         }
       ],
@@ -799,7 +917,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 38 },
       "targets": [
         {
-          "expr": "sum(hikaricp_connections_pending{job=\"$job\"})",
+          "expr": "sum(hikaricp_connections_pending{job=\"$job\",instance=~\"$instance\"})",
           "legendFormat": ""
         }
       ],
@@ -831,7 +949,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 38 },
       "targets": [
         {
-          "expr": "sum(increase(hikaricp_connections_timeout_total{job=\"$job\"}[$__rate_interval]))",
+          "expr": "sum(increase(hikaricp_connections_timeout_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": ""
         }
       ],
@@ -864,7 +982,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 38 },
       "targets": [
         {
-          "expr": "sum(hikaricp_connections{job=\"$job\"})",
+          "expr": "sum(hikaricp_connections{job=\"$job\",instance=~\"$instance\"})",
           "legendFormat": ""
         }
       ],
@@ -895,15 +1013,15 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
       "targets": [
         {
-          "expr": "sum(hikaricp_connections_active{job=\"$job\"})",
+          "expr": "sum(hikaricp_connections_active{job=\"$job\",instance=~\"$instance\"})",
           "legendFormat": "Active"
         },
         {
-          "expr": "sum(hikaricp_connections_idle{job=\"$job\"})",
+          "expr": "sum(hikaricp_connections_idle{job=\"$job\",instance=~\"$instance\"})",
           "legendFormat": "Idle"
         },
         {
-          "expr": "sum(hikaricp_connections_pending{job=\"$job\"})",
+          "expr": "sum(hikaricp_connections_pending{job=\"$job\",instance=~\"$instance\"})",
           "legendFormat": "Pending"
         }
       ],
@@ -947,11 +1065,11 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
       "targets": [
         {
-          "expr": "rate(hikaricp_connections_acquire_milliseconds_sum{job=\"$job\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_acquire_milliseconds_count{job=\"$job\"}[$__rate_interval]) > 0)",
+          "expr": "rate(hikaricp_connections_acquire_milliseconds_sum{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_acquire_milliseconds_count{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]) > 0)",
           "legendFormat": "Acquire"
         },
         {
-          "expr": "rate(hikaricp_connections_usage_milliseconds_sum{job=\"$job\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_usage_milliseconds_count{job=\"$job\"}[$__rate_interval]) > 0)",
+          "expr": "rate(hikaricp_connections_usage_milliseconds_sum{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_usage_milliseconds_count{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]) > 0)",
           "legendFormat": "Usage"
         }
       ],
@@ -996,7 +1114,7 @@
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 51 },
       "targets": [
         {
-          "expr": "sum by (level) (rate(logback_events_total{job=\"$job\"}[$__rate_interval]))",
+          "expr": "sum by (level) (rate(logback_events_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{ level }}"
         }
       ],
@@ -1039,5 +1157,5 @@
     }
   ],
   "schemaVersion": 39,
-  "version": 1
+  "version": 2
 }

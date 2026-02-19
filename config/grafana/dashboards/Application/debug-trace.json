@@ -1,7 +1,7 @@
 {
   "uid": "debug-trace",
   "title": "L4: Debug / Trace",
-  "description": "Trace search, span metrics, and application logs for debugging individual requests",
+  "description": "Trace search, span metrics, service map, and application logs for debugging individual requests",
   "tags": ["spring-boot", "trace", "tempo", "debug"],
   "timezone": "browser",
   "editable": true,
@@ -127,8 +127,28 @@
   "panels": [
     {
       "type": "row",
-      "title": "Span Metrics Overview",
+      "title": "Service Map",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "nodeGraph",
+      "title": "Service Dependency Map",
+      "description": "Service dependency graph derived from distributed traces. Node size = request rate, edge color = error rate. Click a service node to filter traces.",
+      "datasource": { "uid": "${tempo_ds}" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "datasource": { "uid": "${tempo_ds}" },
+          "queryType": "serviceMap",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Span Metrics Overview",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
       "collapsed": false
     },
     {
@@ -136,7 +156,7 @@
       "title": "Trace Rate",
       "description": "Span calls per second across all services",
       "datasource": { "uid": "${metrics_ds}" },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 14 },
       "targets": [
         {
           "expr": "sum(rate(traces_spanmetrics_calls_total{service=\"$service\"}[$__rate_interval]))",
@@ -167,7 +187,7 @@
       "title": "Error Trace Rate",
       "description": "Error span calls per second",
       "datasource": { "uid": "${metrics_ds}" },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 14 },
       "targets": [
         {
           "expr": "sum(rate(traces_spanmetrics_calls_total{service=\"$service\",status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval]))",
@@ -200,7 +220,7 @@
       "title": "P95 Span Duration",
       "description": "95th percentile span duration",
       "datasource": { "uid": "${metrics_ds}" },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 14 },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{service=\"$service\"}[$__rate_interval])) by (le))",
@@ -232,7 +252,7 @@
       "title": "Active Services",
       "description": "Number of services emitting traces",
       "datasource": { "uid": "${metrics_ds}" },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 14 },
       "targets": [
         {
           "expr": "count(count by (service) (traces_spanmetrics_calls_total))",
@@ -260,7 +280,7 @@
     {
       "type": "row",
       "title": "Span Metrics Trend",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
       "collapsed": false
     },
     {
@@ -268,7 +288,7 @@
       "title": "Span Rate by Service",
       "description": "Span calls per second grouped by service",
       "datasource": { "uid": "${metrics_ds}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
       "targets": [
         {
           "expr": "sum by (service) (rate(traces_spanmetrics_calls_total{service=\"$service\"}[$__rate_interval]))",
@@ -297,7 +317,7 @@
       "title": "Span Error Rate Trend",
       "description": "Error rate percentage by service",
       "datasource": { "uid": "${metrics_ds}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
       "targets": [
         {
           "expr": "(\n  (sum by (service) (rate(traces_spanmetrics_calls_total{service=\"$service\",status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval]))\n    or sum by (service) (rate(traces_spanmetrics_calls_total{service=\"$service\"}[$__rate_interval])) * 0)\n  /\n  (sum by (service) (rate(traces_spanmetrics_calls_total{service=\"$service\"}[$__rate_interval])) > 0)\n) * 100",
@@ -330,7 +350,7 @@
     {
       "type": "row",
       "title": "Duration Analysis",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
       "collapsed": false
     },
     {
@@ -338,7 +358,7 @@
       "title": "Span Duration Percentiles",
       "description": "P50, P95, P99 span duration over time",
       "datasource": { "uid": "${metrics_ds}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
       "targets": [
         {
           "expr": "histogram_quantile(0.50, sum(rate(traces_spanmetrics_latency_bucket{service=\"$service\"}[$__rate_interval])) by (le))",
@@ -389,7 +409,7 @@
       "title": "P95 Duration by Operation",
       "description": "95th percentile span duration by span name",
       "datasource": { "uid": "${metrics_ds}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum by (span_name, le) (rate(traces_spanmetrics_latency_bucket{service=\"$service\"}[$__rate_interval])))",
@@ -416,7 +436,7 @@
     {
       "type": "row",
       "title": "Trace Search",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
       "collapsed": false
     },
     {
@@ -424,7 +444,7 @@
       "title": "Trace Search Results",
       "description": "Search traces by service - click Trace ID to view span waterfall below",
       "datasource": { "uid": "${tempo_ds}" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 37 },
       "targets": [
         {
           "datasource": { "uid": "${tempo_ds}" },
@@ -468,7 +488,7 @@
       "title": "Trace Detail",
       "description": "Click a Trace ID above to view the span waterfall diagram",
       "datasource": { "uid": "${tempo_ds}" },
-      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 45 },
       "targets": [
         {
           "datasource": { "uid": "${tempo_ds}" },
@@ -481,7 +501,7 @@
     {
       "type": "row",
       "title": "Logs",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 },
       "collapsed": false
     },
     {
@@ -489,7 +509,7 @@
       "title": "Log Level Rate",
       "description": "Log entries per second grouped by level",
       "datasource": { "uid": "${logs_ds}" },
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 47 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 60 },
       "targets": [
         {
           "datasource": { "uid": "${logs_ds}" },
@@ -533,10 +553,10 @@
     },
     {
       "type": "logs",
-      "title": "Application Logs",
-      "description": "Application logs from Loki - use Log Filter variable to search",
+      "title": "All Application Logs",
+      "description": "All application logs from Loki - use Log Filter variable to search",
       "datasource": { "uid": "${logs_ds}" },
-      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 47 },
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 60 },
       "targets": [
         {
           "datasource": { "uid": "${logs_ds}" },
@@ -554,8 +574,77 @@
         "sortOrder": "Descending",
         "dedupStrategy": "none"
       }
+    },
+    {
+      "type": "row",
+      "title": "Error / Warn Logs",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 68 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Error & Warn Log Rate",
+      "description": "ERROR and WARN log rate over time. Spikes here correlate with incidents and should be cross-referenced with trace error rate.",
+      "datasource": { "uid": "${logs_ds}" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 69 },
+      "targets": [
+        {
+          "datasource": { "uid": "${logs_ds}" },
+          "expr": "sum by (detected_level) (rate({service_name=\"$job\"} |= \"$log_keyword\" | detected_level =~ \"error|warn\" [$__auto]))",
+          "legendFormat": "{{ detected_level }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "error" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "warn" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Error / Warn Logs Only",
+      "description": "ERROR and WARN level logs only for quick incident triage. Use Log Filter variable for keyword search.",
+      "datasource": { "uid": "${logs_ds}" },
+      "gridPos": { "h": 10, "w": 18, "x": 6, "y": 69 },
+      "targets": [
+        {
+          "datasource": { "uid": "${logs_ds}" },
+          "expr": "{service_name=\"$job\"} |= \"$log_keyword\" | detected_level =~ \"error|warn\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      }
     }
   ],
   "schemaVersion": 39,
-  "version": 1
+  "version": 2
 }

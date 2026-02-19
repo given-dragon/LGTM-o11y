@@ -17,7 +17,7 @@
         "datasource": { "uid": "${datasource}" },
         "enable": true,
         "iconColor": "red",
-        "expr": "changes(process_start_time_milliseconds{job=\"$job\"}[$__rate_interval]) > 0",
+        "expr": "changes(process_start_time_milliseconds{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]) > 0",
         "step": "1m",
         "titleFormat": "Application Restarted",
         "textFormat": "{{ $labels.instance }}"
@@ -29,21 +29,21 @@
       "title": "L0: Application Health",
       "type": "link",
       "icon": "arrow-left",
-      "url": "/d/application-health?${datasource:queryparam}&var-job=${job}",
+      "url": "/d/application-health?${datasource:queryparam}&var-job=${job}&var-instance=${instance}",
       "tooltip": "Back to Application Health overview"
     },
     {
       "title": "L1: Service RED Overview",
       "type": "link",
       "icon": "search",
-      "url": "/d/service-red-overview?${datasource:queryparam}&var-job=${job}",
+      "url": "/d/service-red-overview?${datasource:queryparam}&var-job=${job}&var-instance=${instance}",
       "tooltip": "Service-level RED metrics"
     },
     {
       "title": "L3: Endpoint Detail",
       "type": "link",
       "icon": "search",
-      "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}",
+      "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}&var-instance=${instance}",
       "tooltip": "Drill down to endpoint-level detail"
     },
     {
@@ -81,13 +81,38 @@
         }
       },
       {
+        "name": "instance",
+        "label": "Instance",
+        "type": "query",
+        "datasource": { "uid": "${datasource}" },
+        "query": "label_values(jvm_memory_used_bytes{job=\"$job\"}, instance)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
         "name": "heap_pool",
         "label": "Heap Pool",
         "type": "query",
         "datasource": { "uid": "${datasource}" },
         "query": "label_values(jvm_memory_used_bytes{job=\"$job\",area=\"heap\"}, id)",
         "refresh": 2,
-        "sort": 1
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
       },
       {
         "name": "nonheap_pool",
@@ -96,7 +121,15 @@
         "datasource": { "uid": "${datasource}" },
         "query": "label_values(jvm_memory_used_bytes{job=\"$job\",area=\"nonheap\"}, id)",
         "refresh": 2,
-        "sort": 1
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
       }
     ]
   },
@@ -115,7 +148,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
       "targets": [
         {
-          "expr": "jvm_info{job=\"$job\"}",
+          "expr": "jvm_info{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": "{{ version }}"
         }
       ],
@@ -146,7 +179,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
       "targets": [
         {
-          "expr": "system_cpu_count{job=\"$job\"}",
+          "expr": "system_cpu_count{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": ""
         }
       ],
@@ -176,7 +209,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
       "targets": [
         {
-          "expr": "system_load_average_1m{job=\"$job\"}",
+          "expr": "system_load_average_1m{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": ""
         }
       ],
@@ -209,7 +242,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
       "targets": [
         {
-          "expr": "jvm_classes_loaded{job=\"$job\"}",
+          "expr": "jvm_classes_loaded{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": ""
         }
       ],
@@ -240,12 +273,12 @@
     {
       "type": "timeseries",
       "title": "Heap Pools (All)",
-      "description": "Memory used by each heap pool. Stacked to show total composition (ref: 4701 JVM Memory Pools Heap)",
+      "description": "Memory used by each heap pool. 각 라인이 실제 pool 사용량을 나타냅니다. (ref: 4701 JVM Memory Pools Heap)",
       "datasource": { "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
       "targets": [
         {
-          "expr": "jvm_memory_used_bytes{job=\"$job\",area=\"heap\"}",
+          "expr": "jvm_memory_used_bytes{job=\"$job\",instance=~\"$instance\",area=\"heap\"}",
           "legendFormat": "{{ id }}"
         }
       ],
@@ -255,10 +288,9 @@
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "smooth",
-            "fillOpacity": 30,
+            "fillOpacity": 10,
             "pointSize": 5,
-            "showPoints": "auto",
-            "stacking": { "mode": "normal" }
+            "showPoints": "auto"
           }
         }
       },
@@ -275,16 +307,16 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
       "targets": [
         {
-          "expr": "jvm_memory_used_bytes{job=\"$job\",area=\"heap\",id=\"$heap_pool\"}",
-          "legendFormat": "Used"
+          "expr": "jvm_memory_used_bytes{job=\"$job\",instance=~\"$instance\",area=\"heap\",id=~\"$heap_pool\"}",
+          "legendFormat": "Used ({{ id }})"
         },
         {
-          "expr": "jvm_memory_committed_bytes{job=\"$job\",area=\"heap\",id=\"$heap_pool\"}",
-          "legendFormat": "Committed"
+          "expr": "jvm_memory_committed_bytes{job=\"$job\",instance=~\"$instance\",area=\"heap\",id=~\"$heap_pool\"}",
+          "legendFormat": "Committed ({{ id }})"
         },
         {
-          "expr": "jvm_memory_max_bytes{job=\"$job\",area=\"heap\",id=\"$heap_pool\"}",
-          "legendFormat": "Max"
+          "expr": "jvm_memory_max_bytes{job=\"$job\",instance=~\"$instance\",area=\"heap\",id=~\"$heap_pool\"}",
+          "legendFormat": "Max ({{ id }})"
         }
       ],
       "fieldConfig": {
@@ -336,12 +368,12 @@
     {
       "type": "timeseries",
       "title": "Non-Heap Pools (All)",
-      "description": "Memory used by each non-heap pool (Metaspace, CodeCache, etc.). Steady growth in Metaspace may indicate classloader leak (ref: 4701 JVM Memory Pools Non-Heap)",
+      "description": "Memory used by each non-heap pool (Metaspace, CodeCache, etc.). 각 라인이 실제 pool 사용량을 나타냅니다. Metaspace의 지속적인 증가는 classloader leak 가능성을 의미합니다. (ref: 4701 JVM Memory Pools Non-Heap)",
       "datasource": { "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
       "targets": [
         {
-          "expr": "jvm_memory_used_bytes{job=\"$job\",area=\"nonheap\"}",
+          "expr": "jvm_memory_used_bytes{job=\"$job\",instance=~\"$instance\",area=\"nonheap\"}",
           "legendFormat": "{{ id }}"
         }
       ],
@@ -351,10 +383,9 @@
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "smooth",
-            "fillOpacity": 30,
+            "fillOpacity": 10,
             "pointSize": 5,
-            "showPoints": "auto",
-            "stacking": { "mode": "normal" }
+            "showPoints": "auto"
           }
         }
       },
@@ -371,12 +402,12 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
       "targets": [
         {
-          "expr": "jvm_memory_used_bytes{job=\"$job\",area=\"nonheap\",id=\"$nonheap_pool\"}",
-          "legendFormat": "Used"
+          "expr": "jvm_memory_used_bytes{job=\"$job\",instance=~\"$instance\",area=\"nonheap\",id=~\"$nonheap_pool\"}",
+          "legendFormat": "Used ({{ id }})"
         },
         {
-          "expr": "jvm_memory_committed_bytes{job=\"$job\",area=\"nonheap\",id=\"$nonheap_pool\"}",
-          "legendFormat": "Committed"
+          "expr": "jvm_memory_committed_bytes{job=\"$job\",instance=~\"$instance\",area=\"nonheap\",id=~\"$nonheap_pool\"}",
+          "legendFormat": "Committed ({{ id }})"
         }
       ],
       "fieldConfig": {
@@ -413,9 +444,123 @@
       }
     },
     {
+      "type": "timeseries",
+      "title": "Metaspace Usage",
+      "description": "Metaspace used vs committed. Continuous growth after warm-up indicates classloader leak (dynamic proxies, Groovy, etc.). OutOfMemoryError: Metaspace if max is hit.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{job=\"$job\",instance=~\"$instance\",id=\"Metaspace\"}",
+          "legendFormat": "Used"
+        },
+        {
+          "expr": "jvm_memory_committed_bytes{job=\"$job\",instance=~\"$instance\",id=\"Metaspace\"}",
+          "legendFormat": "Committed"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Used" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } },
+              { "id": "custom.fillOpacity", "value": 20 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Committed" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Metaspace Saturation",
+      "description": "Metaspace used as % of committed. Approaching 100% with committed near max risks OOM.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 23 },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{job=\"$job\",instance=~\"$instance\",id=\"Metaspace\"} / clamp_min(jvm_memory_committed_bytes{job=\"$job\",instance=~\"$instance\",id=\"Metaspace\"}, 1) * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "red", "value": 95 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Metaspace Growth Rate",
+      "description": "Rate of Metaspace growth over time. Should approach zero after warm-up. Positive sustained rate = classloader leak.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 23 },
+      "targets": [
+        {
+          "expr": "delta(jvm_memory_used_bytes{job=\"$job\",instance=~\"$instance\",id=\"Metaspace\"}[$__rate_interval])",
+          "legendFormat": "Delta"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Delta" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
       "type": "row",
       "title": "Buffer Pools",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
       "collapsed": false
     },
     {
@@ -423,14 +568,14 @@
       "title": "Buffer Memory",
       "description": "Direct and mapped buffer memory used vs total capacity. Direct memory exhaustion causes NIO failures (ref: 4701 Buffer Pools, 20352)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
       "targets": [
         {
-          "expr": "jvm_buffer_memory_used_bytes{job=\"$job\"}",
+          "expr": "jvm_buffer_memory_used_bytes{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": "Used: {{ id }}"
         },
         {
-          "expr": "jvm_buffer_total_capacity_bytes{job=\"$job\"}",
+          "expr": "jvm_buffer_total_capacity_bytes{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": "Capacity: {{ id }}"
         }
       ],
@@ -456,10 +601,10 @@
       "title": "Buffer Count",
       "description": "Number of buffers in each pool. Growth indicates buffer allocation without release (ref: 4701 Buffer Pools)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "targets": [
         {
-          "expr": "jvm_buffer_count{job=\"$job\"}",
+          "expr": "jvm_buffer_count{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": "{{ id }}"
         }
       ],
@@ -483,7 +628,7 @@
     {
       "type": "row",
       "title": "GC Detail",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
       "collapsed": false
     },
     {
@@ -491,10 +636,10 @@
       "title": "GC Pause Duration per Event",
       "description": "Average time per GC event by action. Increasing trend means individual pauses are getting longer (ref: 4701 GC Pause Durations)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 41 },
       "targets": [
         {
-          "expr": "rate(jvm_gc_pause_milliseconds_sum{job=\"$job\"}[$__rate_interval])\n/\n(rate(jvm_gc_pause_milliseconds_count{job=\"$job\"}[$__rate_interval]) > 0)",
+          "expr": "rate(jvm_gc_pause_milliseconds_sum{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])\n/\n(rate(jvm_gc_pause_milliseconds_count{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]) > 0)",
           "legendFormat": "{{ action }} - {{ cause }}"
         }
       ],
@@ -520,18 +665,18 @@
       "title": "Promotion / Allocation Ratio",
       "description": "Percentage of allocated memory promoted to old generation. Sustained high ratio indicates long-lived object creation (potential memory leak). Left axis: rates, right axis: ratio (ref: 4701 GC Allocated/Promoted, 19004)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 41 },
       "targets": [
         {
-          "expr": "rate(jvm_gc_memory_allocated_bytes_total{job=\"$job\"}[$__rate_interval])",
+          "expr": "rate(jvm_gc_memory_allocated_bytes_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])",
           "legendFormat": "Allocated"
         },
         {
-          "expr": "rate(jvm_gc_memory_promoted_bytes_total{job=\"$job\"}[$__rate_interval])",
+          "expr": "rate(jvm_gc_memory_promoted_bytes_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])",
           "legendFormat": "Promoted"
         },
         {
-          "expr": "(\n  rate(jvm_gc_memory_promoted_bytes_total{job=\"$job\"}[$__rate_interval])\n  / (rate(jvm_gc_memory_allocated_bytes_total{job=\"$job\"}[$__rate_interval]) > 0)\n) * 100",
+          "expr": "(\n  rate(jvm_gc_memory_promoted_bytes_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])\n  / (rate(jvm_gc_memory_allocated_bytes_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]) > 0)\n) * 100",
           "legendFormat": "Promotion Ratio"
         }
       ],
@@ -572,9 +717,47 @@
       }
     },
     {
+      "type": "timeseries",
+      "title": "GC Overhead %",
+      "description": "Percentage of total time spent in GC pause. > 5% = GC pressure, > 25% = GC thrashing (application may become unresponsive). Formula: GC pause ms/s / 1000 * 100.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 41 },
+      "targets": [
+        {
+          "expr": "sum by (action) (rate(jvm_gc_pause_milliseconds_sum{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])) / 1000 * 100",
+          "legendFormat": "{{ action }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "stacking": { "mode": "normal" },
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 25 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
       "type": "row",
       "title": "CPU & System Resources",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
       "collapsed": false
     },
     {
@@ -582,14 +765,14 @@
       "title": "CPU Usage Trend",
       "description": "Process vs System CPU over time. Gap between them shows other processes' CPU usage on the host (ref: 4701 JVM Misc, 20352)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
       "targets": [
         {
-          "expr": "process_cpu_usage{job=\"$job\"} * 100",
+          "expr": "process_cpu_usage{job=\"$job\",instance=~\"$instance\"} * 100",
           "legendFormat": "Process"
         },
         {
-          "expr": "system_cpu_usage{job=\"$job\"} * 100",
+          "expr": "system_cpu_usage{job=\"$job\",instance=~\"$instance\"} * 100",
           "legendFormat": "System"
         }
       ],
@@ -633,22 +816,22 @@
       "title": "System Load & File Descriptors",
       "description": "System load average (left axis) and file descriptor usage (right axis). Load exceeding CPU count = saturation, FD approaching max = imminent failure (ref: 4701, 20352)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
       "targets": [
         {
-          "expr": "system_load_average_1m{job=\"$job\"}",
+          "expr": "system_load_average_1m{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": "Load Avg 1m"
         },
         {
-          "expr": "system_cpu_count{job=\"$job\"}",
+          "expr": "system_cpu_count{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": "CPU Count"
         },
         {
-          "expr": "process_files_open{job=\"$job\"}",
+          "expr": "process_files_open{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": "FD Open"
         },
         {
-          "expr": "process_files_max{job=\"$job\"}",
+          "expr": "process_files_max{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": "FD Max"
         }
       ],
@@ -700,7 +883,7 @@
     {
       "type": "row",
       "title": "HikariCP Detail",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 58 },
       "collapsed": false
     },
     {
@@ -708,18 +891,18 @@
       "title": "Connection Timing Comparison",
       "description": "Average time for create (new connection to DB), acquire (get from pool), and usage (borrowed duration). Create spikes = DB issue. Acquire spikes = pool exhaustion. Usage spikes = slow queries (ref: 19004, 17653)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 51 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 59 },
       "targets": [
         {
-          "expr": "rate(hikaricp_connections_creation_milliseconds_sum{job=\"$job\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_creation_milliseconds_count{job=\"$job\"}[$__rate_interval]) > 0)",
+          "expr": "rate(hikaricp_connections_creation_milliseconds_sum{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_creation_milliseconds_count{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]) > 0)",
           "legendFormat": "Create"
         },
         {
-          "expr": "rate(hikaricp_connections_acquire_milliseconds_sum{job=\"$job\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_acquire_milliseconds_count{job=\"$job\"}[$__rate_interval]) > 0)",
+          "expr": "rate(hikaricp_connections_acquire_milliseconds_sum{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_acquire_milliseconds_count{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]) > 0)",
           "legendFormat": "Acquire"
         },
         {
-          "expr": "rate(hikaricp_connections_usage_milliseconds_sum{job=\"$job\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_usage_milliseconds_count{job=\"$job\"}[$__rate_interval]) > 0)",
+          "expr": "rate(hikaricp_connections_usage_milliseconds_sum{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])\n/\n(rate(hikaricp_connections_usage_milliseconds_count{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]) > 0)",
           "legendFormat": "Usage"
         }
       ],
@@ -759,14 +942,14 @@
       "title": "Connection Lifecycle",
       "description": "Connection creation and timeout event rates. Creation rate spikes when pool needs new connections (cold start, eviction). Timeout rate indicates pool cannot serve demand (ref: 19004 HikariCP, 17653)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 51 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 59 },
       "targets": [
         {
-          "expr": "rate(hikaricp_connections_creation_milliseconds_count{job=\"$job\"}[$__rate_interval])",
+          "expr": "rate(hikaricp_connections_creation_milliseconds_count{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])",
           "legendFormat": "Creation Rate"
         },
         {
-          "expr": "rate(hikaricp_connections_timeout_total{job=\"$job\"}[$__rate_interval])",
+          "expr": "rate(hikaricp_connections_timeout_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])",
           "legendFormat": "Timeout Rate"
         }
       ],
@@ -800,7 +983,7 @@
     {
       "type": "row",
       "title": "Class Loading",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 67 },
       "collapsed": false
     },
     {
@@ -808,10 +991,10 @@
       "title": "Loaded Classes",
       "description": "Number of currently loaded classes over time. Steady upward trend after warm-up indicates classloader leak (dynamic proxies, script engines) (ref: 4701 Classloading, 20352)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 60 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 68 },
       "targets": [
         {
-          "expr": "jvm_classes_loaded{job=\"$job\"}",
+          "expr": "jvm_classes_loaded{job=\"$job\",instance=~\"$instance\"}",
           "legendFormat": "Loaded"
         }
       ],
@@ -837,10 +1020,10 @@
       "title": "Class Loading Rate",
       "description": "Rate of class loading. Should settle to near-zero after application warm-up. Sustained positive rate suggests dynamic class generation (ref: 4701 Classloading)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 60 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 68 },
       "targets": [
         {
-          "expr": "delta(jvm_classes_loaded{job=\"$job\"}[$__rate_interval])",
+          "expr": "delta(jvm_classes_loaded{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])",
           "legendFormat": "Delta"
         }
       ],
@@ -868,5 +1051,5 @@
     }
   ],
   "schemaVersion": 39,
-  "version": 1
+  "version": 2
 }

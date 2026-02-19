@@ -17,7 +17,7 @@
         "datasource": { "uid": "${datasource}" },
         "enable": true,
         "iconColor": "red",
-        "expr": "changes(process_start_time_milliseconds{job=\"$job\"}[$__rate_interval]) > 0",
+        "expr": "changes(process_start_time_milliseconds{job=\"$job\",instance=~\"$instance\"}[$__rate_interval]) > 0",
         "step": "1m",
         "titleFormat": "Application Restarted",
         "textFormat": "{{ $labels.instance }}"
@@ -29,14 +29,14 @@
       "title": "L0: Application Health",
       "type": "link",
       "icon": "arrow-left",
-      "url": "/d/application-health?${datasource:queryparam}&var-job=${job}",
+      "url": "/d/application-health?${datasource:queryparam}&var-job=${job}&var-instance=${instance}",
       "tooltip": "Back to Application Health overview"
     },
     {
       "title": "L3: Endpoint Detail",
       "type": "link",
       "icon": "search",
-      "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}",
+      "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}&var-instance=${instance}",
       "tooltip": "Drill down to endpoint-level detail"
     },
     {
@@ -50,7 +50,7 @@
       "title": "L2: JVM & DB Deep Dive",
       "type": "link",
       "icon": "search",
-      "url": "/d/jvm-db-deep-dive?${datasource:queryparam}&var-job=${job}",
+      "url": "/d/jvm-db-deep-dive?${datasource:queryparam}&var-job=${job}&var-instance=${instance}",
       "tooltip": "Drill down to JVM memory pools, GC detail, and HikariCP diagnostics"
     }
   ],
@@ -79,6 +79,40 @@
           "text": "caro-demo-app",
           "value": "caro-demo-app"
         }
+      },
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "query",
+        "datasource": { "uid": "${datasource}" },
+        "query": "label_values(http_server_requests_milliseconds{job=\"$job\"}, instance)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "method",
+        "label": "Method",
+        "type": "query",
+        "datasource": { "uid": "${datasource}" },
+        "query": "label_values(http_server_requests_milliseconds{job=\"$job\"}, method)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
       }
     ]
   },
@@ -94,10 +128,10 @@
       "title": "Request Rate",
       "description": "Current requests per second",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
       "targets": [
         {
-          "expr": "sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "expr": "sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))",
           "legendFormat": ""
         }
       ],
@@ -122,13 +156,13 @@
     },
     {
       "type": "stat",
-      "title": "Error Rate",
-      "description": "HTTP 5xx error percentage",
+      "title": "5xx Error Rate",
+      "description": "HTTP 5xx server error percentage",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
       "targets": [
         {
-          "expr": "(\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",status=~\"5..\"}[$__rate_interval]))) or vector(0))\n  /\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0)\n) * 100",
+          "expr": "(\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\",status=~\"5..\"}[$__rate_interval]))) or vector(0))\n  /\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) > 0)\n) * 100",
           "legendFormat": ""
         }
       ],
@@ -156,13 +190,47 @@
     },
     {
       "type": "stat",
+      "title": "4xx Client Error Rate",
+      "description": "HTTP 4xx client error percentage (auth, validation, not found, etc.)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "targets": [
+        {
+          "expr": "(\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\",status=~\"4..\"}[$__rate_interval]))) or vector(0))\n  /\n  (sum(histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) > 0)\n) * 100",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 15 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "type": "stat",
       "title": "P95 Latency",
       "description": "95th percentile response time",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))",
           "legendFormat": ""
         }
       ],
@@ -191,10 +259,10 @@
       "title": "SLO Compliance",
       "description": "Requests under 500ms (SLO target: 99%)",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
       "targets": [
         {
-          "expr": "(histogram_fraction(0, 500, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) * 100) or vector(100)",
+          "expr": "(histogram_fraction(0, 500, sum(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) * 100) or vector(100)",
           "legendFormat": ""
         }
       ],
@@ -220,6 +288,40 @@
       }
     },
     {
+      "type": "stat",
+      "title": "SLO Burn Rate (1h)",
+      "description": "1h burn rate relative to SLO error budget (99% under 500ms). Rate > 1 means budget depleting. Rate > 5 triggers fast-burn alert.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "targets": [
+        {
+          "expr": "(1 - histogram_fraction(0, 500, sum(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[1h])))) / (1 - 0.99)",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "textMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
       "type": "row",
       "title": "Rate",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
@@ -233,7 +335,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
       "targets": [
         {
-          "expr": "sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "expr": "sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))",
           "legendFormat": "{{ uri }}"
         }
       ],
@@ -262,7 +364,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
       "targets": [
         {
-          "expr": "sum by (status) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "expr": "sum by (status) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))",
           "legendFormat": "{{ status }}"
         }
       ],
@@ -303,13 +405,13 @@
     },
     {
       "type": "timeseries",
-      "title": "Error Rate by Endpoint",
-      "description": "HTTP 5xx error percentage per endpoint",
+      "title": "5xx Error Rate by Endpoint",
+      "description": "HTTP 5xx server error percentage per endpoint",
       "datasource": { "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
       "targets": [
         {
-          "expr": "(\n  (\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",status=~\"5..\"}[$__rate_interval])))\n    or\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) * 0\n  )\n  /\n  (sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0)\n) * 100",
+          "expr": "(\n  (\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\",status=~\"5..\"}[$__rate_interval])))\n    or\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) * 0\n  )\n  /\n  (sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) > 0)\n) * 100",
           "legendFormat": "{{ uri }}"
         }
       ],
@@ -339,13 +441,77 @@
     {
       "type": "timeseries",
       "title": "5xx Error Count by Endpoint",
-      "description": "Absolute 5xx error count per second by endpoint",
+      "description": "Absolute 5xx server error count per second by endpoint",
       "datasource": { "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
       "targets": [
         {
-          "expr": "sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",status=~\"5..\"}[$__rate_interval])))",
+          "expr": "sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\",status=~\"5..\"}[$__rate_interval])))",
           "legendFormat": "{{ uri }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "4xx Client Error Rate by Endpoint",
+      "description": "HTTP 4xx client error percentage per endpoint (auth failures, validation errors, not found)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "targets": [
+        {
+          "expr": "(\n  (\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\",status=~\"4..\"}[$__rate_interval])))\n    or\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) * 0\n  )\n  /\n  (sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) > 0)\n) * 100",
+          "legendFormat": "{{ uri }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 30 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "4xx Client Error Count by Endpoint",
+      "description": "Absolute 4xx client error count per second by endpoint and status code",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "targets": [
+        {
+          "expr": "sum by (uri, status) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\",status=~\"4..\"}[$__rate_interval])))",
+          "legendFormat": "{{ uri }} [{{ status }}]"
         }
       ],
       "fieldConfig": {
@@ -367,27 +533,30 @@
     {
       "type": "row",
       "title": "Duration",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
       "collapsed": false
     },
     {
       "type": "timeseries",
       "title": "Latency Percentiles (P50 / P95 / P99)",
-      "description": "Response time percentiles over time",
+      "description": "Response time percentiles over time. Click an exemplar dot (if available) to jump directly to the trace.",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
-          "legendFormat": "P50"
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))",
+          "legendFormat": "P50",
+          "exemplar": true
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
-          "legendFormat": "P95"
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))",
+          "legendFormat": "P95",
+          "exemplar": true
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
-          "legendFormat": "P99"
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))",
+          "legendFormat": "P99",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -424,13 +593,14 @@
     {
       "type": "timeseries",
       "title": "P95 Latency by Endpoint",
-      "description": "95th percentile response time per endpoint",
+      "description": "95th percentile response time per endpoint. Click exemplar dots to jump to the slowest trace.",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
-          "legendFormat": "{{ uri }}"
+          "expr": "histogram_quantile(0.95, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))",
+          "legendFormat": "{{ uri }}",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -457,14 +627,54 @@
       }
     },
     {
+      "type": "heatmap",
+      "title": "Latency Distribution Heatmap",
+      "description": "Response time distribution over time. Reveals bimodal distributions, tail latency spikes, and outliers that are invisible in percentile lines.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))",
+          "legendFormat": "",
+          "format": "heatmap"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "scheme",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" },
+        "filterValues": { "le": 1e-9 },
+        "tooltip": { "mode": "single", "yHistogram": false },
+        "yAxis": {
+          "axisPlacement": "left",
+          "reverse": false,
+          "unit": "ms"
+        }
+      }
+    },
+    {
       "type": "bargauge",
       "title": "Average Latency by Endpoint",
       "description": "Average response time per endpoint for quick comparison",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 48 },
       "targets": [
         {
-          "expr": "histogram_avg(sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))",
+          "expr": "histogram_avg(sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))",
           "legendFormat": "{{ uri }}"
         }
       ],
@@ -490,7 +700,7 @@
     {
       "type": "row",
       "title": "Endpoint Detail",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 54 },
       "collapsed": false
     },
     {
@@ -498,10 +708,10 @@
       "title": "Endpoint Summary",
       "description": "All endpoints with Rate, Error %, P50, P95, P99",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 39 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 55 },
       "targets": [
         {
-          "expr": "sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0",
+          "expr": "sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) > 0",
           "legendFormat": "",
           "refId": "A",
           "format": "table",
@@ -509,7 +719,7 @@
           "range": true
         },
         {
-          "expr": "(\n  (\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",status=~\"5..\"}[$__rate_interval])))\n    or\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) * 0\n  )\n  /\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))\n) * 100\nand\nsum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0",
+          "expr": "(\n  (\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\",status=~\"5..\"}[$__rate_interval])))\n    or\n    sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) * 0\n  )\n  /\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))\n) * 100\nand\nsum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) > 0",
           "legendFormat": "",
           "refId": "B",
           "format": "table",
@@ -517,7 +727,7 @@
           "range": true
         },
         {
-          "expr": "(\n  histogram_quantile(0.50, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))\n  and\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0\n) >= 0",
+          "expr": "(\n  histogram_quantile(0.50, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))\n  and\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) > 0\n) >= 0",
           "legendFormat": "",
           "refId": "C",
           "format": "table",
@@ -525,7 +735,7 @@
           "range": true
         },
         {
-          "expr": "(\n  histogram_quantile(0.95, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))\n  and\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0\n) >= 0",
+          "expr": "(\n  histogram_quantile(0.95, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))\n  and\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) > 0\n) >= 0",
           "legendFormat": "",
           "refId": "D",
           "format": "table",
@@ -533,7 +743,7 @@
           "range": true
         },
         {
-          "expr": "(\n  histogram_quantile(0.99, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval])))\n  and\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\"}[$__rate_interval]))) > 0\n) >= 0",
+          "expr": "(\n  histogram_quantile(0.99, sum by (uri) (rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval])))\n  and\n  sum by (uri) (histogram_count(rate(http_server_requests_milliseconds{job=\"$job\",instance=~\"$instance\",method=~\"$method\"}[$__rate_interval]))) > 0\n) >= 0",
           "legendFormat": "",
           "refId": "E",
           "format": "table",
@@ -542,46 +752,21 @@
         }
       ],
       "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
+        { "id": "merge", "options": {} },
         {
           "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "pattern": "^(uri|Value).*"
-            }
-          }
+          "options": { "include": { "pattern": "^(uri|Value).*" } }
         },
         {
           "id": "groupBy",
           "options": {
             "fields": {
-              "uri": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "Value #A": {
-                "aggregations": ["mean"],
-                "operation": "aggregate"
-              },
-              "Value #B": {
-                "aggregations": ["mean"],
-                "operation": "aggregate"
-              },
-              "Value #C": {
-                "aggregations": ["mean"],
-                "operation": "aggregate"
-              },
-              "Value #D": {
-                "aggregations": ["mean"],
-                "operation": "aggregate"
-              },
-              "Value #E": {
-                "aggregations": ["mean"],
-                "operation": "aggregate"
-              }
+              "uri": { "aggregations": [], "operation": "groupby" },
+              "Value #A": { "aggregations": ["mean"], "operation": "aggregate" },
+              "Value #B": { "aggregations": ["mean"], "operation": "aggregate" },
+              "Value #C": { "aggregations": ["mean"], "operation": "aggregate" },
+              "Value #D": { "aggregations": ["mean"], "operation": "aggregate" },
+              "Value #E": { "aggregations": ["mean"], "operation": "aggregate" }
             }
           }
         },
@@ -621,7 +806,7 @@
                 "value": [
                   {
                     "title": "View Endpoint Detail",
-                    "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}&var-uri=${__data.fields.Endpoint}",
+                    "url": "/d/endpoint-detail?${datasource:queryparam}&var-job=${job}&var-instance=${instance}&var-uri=${__data.fields.Endpoint}",
                     "targetBlank": false
                   }
                 ]
@@ -660,5 +845,5 @@
     }
   ],
   "schemaVersion": 39,
-  "version": 1
+  "version": 2
 }
