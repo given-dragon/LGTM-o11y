@@ -69,9 +69,9 @@ groups:
           description: "Exporter 큐 사용률이 {{ $value | humanize }}%입니다. 백엔드가 느리거나 도달 불가능할 수 있습니다."
       - alert: ExporterSendFailures
         expr: |
-          increase(otelcol_exporter_send_failed_spans[5m]) > 0
-          or increase(otelcol_exporter_send_failed_metric_points[5m]) > 0
-          or increase(otelcol_exporter_send_failed_log_records[5m]) > 0
+          increase(otelcol_exporter_send_failed_spans_total[5m]) > 0
+          or increase(otelcol_exporter_send_failed_metric_points_total[5m]) > 0
+          or increase(otelcol_exporter_send_failed_log_records_total[5m]) > 0
         for: 5m
         labels:
           severity: warning
@@ -79,15 +79,15 @@ groups:
         annotations:
           summary: "Exporter 데이터 전송이 실패하고 있습니다"
           description: "Exporter가 데이터 전송에 실패하고 있습니다. 백엔드 장애 가능성이 있습니다."
-      - alert: MemoryLimiterDropping
+      - alert: ReceiverRefusingData
         expr: |
-          increase(otelcol_processor_refused_spans[5m]) > 0
-          or increase(otelcol_processor_refused_metric_points[5m]) > 0
-          or increase(otelcol_processor_refused_log_records[5m]) > 0
+          increase(otelcol_receiver_refused_spans_total[5m]) > 0
+          or increase(otelcol_receiver_refused_metric_points_total[5m]) > 0
+          or increase(otelcol_receiver_refused_log_records_total[5m]) > 0
         for: 1m
         labels:
           severity: critical
           service: alloy
         annotations:
-          summary: "Memory limiter가 데이터를 드롭하고 있습니다"
-          description: "Alloy memory limiter가 데이터를 거부하고 있습니다. 거부된 데이터는 영구적으로 손실됩니다."
+          summary: "Alloy receiver가 데이터를 거부하고 있습니다"
+          description: "Alloy receiver가 데이터를 거부하고 있습니다. memory limiter 또는 backpressure로 인한 것으로, 거부된 데이터는 영구적으로 손실됩니다."

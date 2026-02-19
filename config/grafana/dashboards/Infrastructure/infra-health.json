@@ -358,15 +358,15 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
       "targets": [
         {
-          "expr": "rate(otelcol_exporter_send_failed_spans[$__rate_interval])",
+          "expr": "rate(otelcol_exporter_send_failed_spans_total[$__rate_interval])",
           "legendFormat": "Traces ({{ exporter }})"
         },
         {
-          "expr": "rate(otelcol_exporter_send_failed_metric_points[$__rate_interval])",
+          "expr": "rate(otelcol_exporter_send_failed_metric_points_total[$__rate_interval])",
           "legendFormat": "Metrics ({{ exporter }})"
         },
         {
-          "expr": "rate(otelcol_exporter_send_failed_log_records[$__rate_interval])",
+          "expr": "rate(otelcol_exporter_send_failed_log_records_total[$__rate_interval])",
           "legendFormat": "Logs ({{ exporter }})"
         }
       ],
@@ -389,21 +389,21 @@
     },
     {
       "type": "timeseries",
-      "title": "Memory Limiter Drops",
-      "description": "memory limiter에 의한 데이터 드롭률. 드롭된 데이터는 영구적으로 손실되어 복구 불가능합니다.",
+      "title": "Receiver Refused (Backpressure)",
+      "description": "수신 거부된 데이터율. memory limiter 또는 백엔드 backpressure로 인해 receiver가 거부한 데이터입니다. 거부된 데이터는 클라이언트에서 재시도하지 않으면 영구 손실됩니다.",
       "datasource": { "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
       "targets": [
         {
-          "expr": "rate(otelcol_processor_refused_spans[$__rate_interval])",
+          "expr": "rate(otelcol_receiver_refused_spans_total[$__rate_interval])",
           "legendFormat": "Traces"
         },
         {
-          "expr": "rate(otelcol_processor_refused_metric_points[$__rate_interval])",
+          "expr": "rate(otelcol_receiver_refused_metric_points_total[$__rate_interval])",
           "legendFormat": "Metrics"
         },
         {
-          "expr": "rate(otelcol_processor_refused_log_records[$__rate_interval])",
+          "expr": "rate(otelcol_receiver_refused_log_records_total[$__rate_interval])",
           "legendFormat": "Logs"
         }
       ],
@@ -427,8 +427,194 @@
     },
     {
       "type": "row",
-      "title": "Resources",
+      "title": "Pipeline Throughput",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Accepted Spans Rate (Traces)",
+      "description": "Alloy receiver가 수신한 초당 Span 수. 애플리케이션에서 Alloy로 유입되는 트레이스 처리량입니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
+      "targets": [
+        {
+          "expr": "sum(rate(otelcol_receiver_accepted_spans_total[$__rate_interval]))",
+          "legendFormat": "Spans/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Accepted Metric Points Rate",
+      "description": "Alloy receiver가 수신한 초당 Metric Point 수. 애플리케이션에서 Alloy로 유입되는 메트릭 처리량입니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+      "targets": [
+        {
+          "expr": "sum(rate(otelcol_receiver_accepted_metric_points_total[$__rate_interval]))",
+          "legendFormat": "Metric Points/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Accepted Log Records Rate",
+      "description": "Alloy receiver가 수신한 초당 Log Record 수. 애플리케이션에서 Alloy로 유입되는 로그 처리량입니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
+      "targets": [
+        {
+          "expr": "sum(rate(otelcol_receiver_accepted_log_records_total[$__rate_interval]))",
+          "legendFormat": "Log Records/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Backend Ingestion Rates",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Loki Log Ingestion Rate",
+      "description": "Loki Distributor가 수신하는 초당 로그 바이트 수. 급격한 변화는 로그 폭증 또는 수집 중단을 의미합니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+      "targets": [
+        {
+          "expr": "sum(rate(loki_distributor_bytes_received_total[$__rate_interval]))",
+          "legendFormat": "Loki Ingestion"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Mimir Metric Ingestion Rate",
+      "description": "Mimir Distributor가 수신하는 초당 샘플 수. 급격한 변화는 메트릭 카디널리티 폭증 또는 수집 중단을 의미합니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
+      "targets": [
+        {
+          "expr": "sum(rate(cortex_distributor_samples_in_total[$__rate_interval]))",
+          "legendFormat": "Mimir Ingestion"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Tempo Span Ingestion Rate",
+      "description": "Tempo Distributor가 수신하는 초당 Span 수. 트레이스 수집 처리량 추이를 확인합니다.",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
+      "targets": [
+        {
+          "expr": "sum(rate(tempo_distributor_spans_received_total[$__rate_interval]))",
+          "legendFormat": "Tempo Ingestion"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Resources",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
       "collapsed": false
     },
     {
@@ -436,7 +622,7 @@
       "title": "Memory Usage by Service",
       "description": "서비스별 실제 메모리 점유율.",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 },
       "targets": [
         {
           "expr": "process_resident_memory_bytes{job=\"alloy\"}",
@@ -477,7 +663,7 @@
       "title": "GC Pause Duration by Service",
       "description": "서비스별 최대 GC 정지시간. 이 수치가 높으면 Latency에 직접적인 영향을 미칩니다.",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 },
       "targets": [
         {
           "expr": "go_gc_duration_seconds{job=\"alloy\",quantile=\"1.0\"}",
@@ -516,7 +702,7 @@
     {
       "type": "row",
       "title": "Goroutines",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
       "collapsed": false
     },
     {
@@ -524,7 +710,7 @@
       "title": "Goroutines by Service",
       "datasource": { "uid": "${datasource}" },
       "description": "서비스별 활성 goroutine 수. 갑작스러운 수치 상승은 리소스 누수를 의미할 수 있습니다.",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 46 },
       "targets": [
         {
           "expr": "go_goroutines{job=\"alloy\"}",
@@ -562,5 +748,5 @@
     }
   ],
   "schemaVersion": 39,
-  "version": 1
+  "version": 2
 }
