@@ -48,19 +48,23 @@ Caro-Demo Application (Spring Boot 4 + OpenTelemetry)
 ### 사전 요구사항
 
 - Docker & Docker Compose
+- [Infisical CLI](https://infisical.com/docs/cli/overview) (`brew install infisical/get-cli/infisical`)
 - (선택) JDK 24 + Gradle 8 (caro-demo 로컬 개발 시)
 
 ### 실행
 
 ```bash
-# 1. 환경 변수 설정
-cp .env.example .env
+# 1. Infisical 로그인 (최초 1회)
+infisical login
 
-# 2. 전체 스택 실행
-docker compose up -d
+# 2. 프로젝트 연결 (최초 1회)
+infisical init
 
-# 3. 서비스 상태 확인
-docker compose ps
+# 3. 전체 스택 실행
+make up
+
+# 4. 서비스 상태 확인
+make ps
 ```
 
 ### 접속
@@ -74,10 +78,23 @@ docker compose ps
 
 ## 환경 변수
 
+환경 변수는 Infisical에서 관리한다. `.env` 파일을 직접 생성하지 않는다.
+
+### Infisical 경로 구조
+
+| 경로 | 설명 |
+|------|------|
+| `/lgtm` | LGTM 스택 설정 (포트, Grafana 인증, Alertmanager 등) |
+| `/garage` | Garage S3 오브젝트 스토리지 크리덴셜 |
+
+`/lgtm`은 Secret Import로 `/garage`를 포함하므로 `make up` 한 번으로 모든 변수가 주입된다.
+
+### /lgtm 경로
+
 | 변수 | 기본값 | 설명 |
 |------|--------|------|
 | `GRAFANA_ADMIN_USER` | `admin` | Grafana 관리자 계정 |
-| `GRAFANA_ADMIN_PASSWORD` | `admin` | Grafana 관리자 비밀번호 |
+| `GRAFANA_ADMIN_PASSWORD` | - | Grafana 관리자 비밀번호 |
 | `GRAFANA_PORT` | `3000` | Grafana 포트 |
 | `LOKI_PORT` | `3100` | Loki HTTP API 포트 |
 | `TEMPO_PORT` | `3200` | Tempo HTTP API 포트 |
@@ -87,17 +104,29 @@ docker compose ps
 | `ALLOY_OTLP_HTTP_PORT` | `4318` | Alloy OTLP HTTP 수신 포트 |
 | `ALERTMANAGER_PORT` | `9093` | Alertmanager 포트 |
 | `CARO_DEMO_PORT` | `8080` | Caro-Demo 애플리케이션 포트 |
-| `SLACK_WEBHOOK_URL` | (비어 있음) | Slack 알림 웹훅 URL |
-| `ALERT_EMAIL_TO` | (비어 있음) | 알림 수신 이메일 |
-| `ALERT_EMAIL_FROM` | (비어 있음) | 알림 발신 이메일 |
 | `ENVIRONMENT` | `development` | 실행 환경 |
+
+### /garage 경로
+
+| 변수 | 설명 |
+|------|------|
+| `GARAGE_ENDPOINT` | Garage S3 엔드포인트 URL |
+| `GARAGE_LOKI_ACCESS_KEY_ID` | Loki용 접근 키 ID |
+| `GARAGE_LOKI_SECRET_ACCESS_KEY` | Loki용 시크릿 키 |
+| `GARAGE_MIMIR_ACCESS_KEY_ID` | Mimir용 접근 키 ID |
+| `GARAGE_MIMIR_SECRET_ACCESS_KEY` | Mimir용 시크릿 키 |
+| `GARAGE_TEMPO_ACCESS_KEY` | Tempo용 접근 키 |
+| `GARAGE_TEMPO_SECRET_KEY` | Tempo용 시크릿 키 |
+| `GARAGE_METRIC_BEARER_TOKEN` | Garage 메트릭 수집용 Bearer 토큰 |
 
 ## 프로젝트 구조
 
 ```
 o11y/
 ├── docker-compose.yaml          # 서비스 오케스트레이션
-├── .env.example                 # 환경 변수 템플릿
+├── Makefile                     # 실행 명령어 래퍼 (infisical run 포함)
+├── .infisical.json              # Infisical 프로젝트 연결 설정
+├── .env.example                 # 환경 변수 참조 (Infisical 경로 안내)
 ├── config/
 │   ├── alloy/
 │   │   └── config.alloy         # OTLP 수신 및 라우팅 설정
@@ -185,11 +214,7 @@ Alloy는 OTLP 프로토콜로 애플리케이션의 텔레메트리 데이터를
 
 ### Slack 알림 설정
 
-1. `.env`에 `SLACK_WEBHOOK_URL`을 설정한다
-2. 알림은 심각도별로 다른 채널로 라우팅된다:
-   - Critical: `#staging-critical` / `#prod-critical`
-   - Warning: `#staging-warnings` / `#prod-warnings`
-   - Default: `#staging-alerts` / `#prod-alerts`
+Slack 알림은 `config/mimir/alertmanager-tenants/` 의 Alertmanager 설정 파일에서 직접 웹훅 URL을 구성한다.
 
 ## Caro-Demo 애플리케이션
 
@@ -243,36 +268,47 @@ Spring Boot 4 + Spring Modulith 기반의 플래시카드 학습 플랫폼 데�
 
 ## 운영
 
+### 기본 명령어
+
+```bash
+make up                      # 스택 시작 (dev 환경)
+make down                    # 스택 중지
+make restart                 # 스택 재시작
+make ps                      # 서비스 상태 확인
+make env-check               # 주입되는 환경변수 확인
+```
+
+### 환경 전환
+
+```bash
+INFISICAL_ENV=staging make up
+INFISICAL_ENV=prod make up
+```
+
 ### 로그 확인
 
 ```bash
-# 전체 서비스 로그
-docker compose logs -f
-
-# 특정 서비스 로그
-docker compose logs -f alloy
-docker compose logs -f caro-demo
+make logs                    # 전체 서비스 로그
+make logs SVC=alloy          # 특정 서비스 로그
+make logs SVC=caro-demo
 ```
 
 ### 서비스 재시작
 
 ```bash
-# 특정 서비스 재시작
-docker compose restart alloy
-
-# 설정 변경 후 재생성
-docker compose up -d --force-recreate alloy
+docker compose restart alloy           # 특정 서비스 재시작
+docker compose up -d --force-recreate alloy  # 설정 변경 후 재생성
 ```
 
 ### 데이터 초기화
 
 ```bash
 # 전체 스택 중지 및 데이터 삭제
-docker compose down -v
+make down
 rm -rf data/*
 
 # 다시 시작
-docker compose up -d
+make up
 ```
 
 ### 리소스 모니터링
@@ -280,14 +316,3 @@ docker compose up -d
 ```bash
 docker stats
 ```
-
-## 트러블슈팅
-
-| 증상 | 확인 사항 |
-|------|-----------|
-| Grafana에 데이터 없음 | Alloy UI (`localhost:12345`)에서 파이프라인 상태 확인 |
-| 메트릭 누락 | Mimir 로그에서 테넌트 ID 일치 여부 확인 |
-| 트레이스 누락 | Caro-Demo의 `OTLP_ENDPOINT` 환경 변수 확인 |
-| 알림 미작동 | `SLACK_WEBHOOK_URL` 설정 및 Alertmanager 로그 확인 |
-| 서비스 시작 실패 | `docker compose logs <서비스명>`으로 에러 확인 |
-| 포트 충돌 | `.env`에서 포트 번호 변경 |
