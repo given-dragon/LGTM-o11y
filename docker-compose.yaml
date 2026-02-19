@@ -55,12 +55,6 @@ services:
       - ./data/loki:/loki
     networks:
       - observability
-    healthcheck:
-      test: [ "CMD", "/usr/bin/loki", "-health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
   # Tempo - Distributed Tracing
   tempo:
