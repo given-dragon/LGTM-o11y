@@ -155,3 +155,25 @@ prometheus.remote_write "mimir" {
     }
   }
 }
+
+
+// ============================================================
+// Garage 수집
+// ============================================================
+prometheus.scrape "garage" {
+  targets = [
+    {__address__ = "192.168.2.90:3903", job = "garage", node = "node1"},
+    {__address__ = "192.168.2.47:3903", job = "garage", node = "node2"},
+    {__address__ = "192.168.2.136:3903", job = "garage", node = "node3"},
+  ]
+
+  authorization {
+    type        = "Bearer"
+    credentials = sys.env("GARAGE_METRIC_BEARER_TOKEN")
+  }
+
+  metrics_path = "/metrics"
+  scrape_interval = "30s"
+
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
